@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import { CalendarDays, ChevronDown, KeyRound, Menu as MenuIcon, X } from "lucide-react";
 import { Button, Logo } from "../kit";
 import { cn } from "../../lib/cn";
-import { howItWorks, type DropdownCard } from "./landingData";
 import { SolutionsMegaPanel } from "./SolutionsMegaPanel";
 import { FeaturesMegaPanel } from "./FeaturesMegaPanel";
+import { HowItWorksMegaPanel } from "./HowItWorksMegaPanel";
 
 // Trimmed down per explicit founder direction: only Solutions, Features,
 // How It Works, Pricing, Contact -- Industries, Resources, and About
@@ -27,45 +27,6 @@ function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function CardGrid({ cards }: { cards: DropdownCard[] }) {
-  const [expanded, setExpanded] = useState<number | null>(null);
-
-  return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-      {cards.map((card, i) => {
-        const isOpen = expanded === i;
-        return (
-          <div key={card.title} className="rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-elevated">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-3">
-              <card.icon size={16} />
-            </div>
-            <p className="text-sm font-semibold tracking-tight">{card.title}</p>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{card.description}</p>
-            <button
-              onClick={() => setExpanded(isOpen ? null : i)}
-              className="text-xs font-medium text-primary mt-2.5 inline-flex items-center gap-1 hover:underline"
-              aria-expanded={isOpen}
-            >
-              Learn More
-              <ChevronDown size={12} className={cn("transition-transform", isOpen && "rotate-180")} />
-            </button>
-            {isOpen && (
-              <ul className="mt-3 pt-3 border-t border-border space-y-1.5 animate-fade-in">
-                {card.details.map((d) => (
-                  <li key={d} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
-                    <span className="text-primary shrink-0">•</span>
-                    {d}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function MenuPanel({ activeKey }: { activeKey: DropdownKey }) {
   if (activeKey === "solutions") {
     return <SolutionsMegaPanel />;
@@ -76,12 +37,7 @@ function MenuPanel({ activeKey }: { activeKey: DropdownKey }) {
   }
 
   // how-it-works
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">How It Works</p>
-      <CardGrid cards={howItWorks} />
-    </div>
-  );
+  return <HowItWorksMegaPanel />;
 }
 
 export function LandingNavbar() {
