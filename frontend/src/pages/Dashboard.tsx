@@ -245,7 +245,19 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  {/* table-fixed + explicit column widths -- with variable
+                      row counts, auto layout can size header vs. data cells
+                      slightly differently and columns drift out of sync.
+                      Fixed widths guarantee every header sits directly above
+                      its column's data regardless of row count. */}
+                  <table className="w-full text-sm table-fixed">
+                    <colgroup>
+                      <col className="w-[34%]" />
+                      <col className="hidden sm:table-column sm:w-[16%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[24%]" />
+                      <col className="w-[12%]" />
+                    </colgroup>
                     <thead>
                       <tr className="text-left text-xs text-muted-foreground uppercase tracking-wide border-b border-border">
                         <th className="px-6 py-2.5 font-medium whitespace-nowrap">Tender</th>
@@ -277,28 +289,37 @@ export default function Dashboard() {
                           <td className="px-3 py-3 whitespace-nowrap">
                             <Badge value={m.status} label={EVAL_STATUS_LABEL[m.status]} withIcon />
                           </td>
-                          <td className="px-3 py-3 text-right whitespace-nowrap">
-                            <Menu
-                              align="right"
-                              label={`Actions for ${m.mission_type}`}
-                              trigger={
-                                <span className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-surface-hover hover:text-foreground">
-                                  <MoreVertical size={15} />
-                                </span>
-                              }
-                            >
-                              <MenuItem icon={<FileSearch size={14} />} onClick={() => navigate(`/missions/${m.id}`)}>
-                                View Details
-                              </MenuItem>
-                              {m.status === "created" && (
-                                <MenuItem
-                                  icon={<Sparkles size={14} />}
-                                  onClick={() => handleRunFullAnalysis(m.id)}
-                                >
-                                  {runningId === m.id ? "Running…" : "Run Full Analysis"}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {/* Menu's root is a block <div>, which text-align
+                                on the <td> can't shift -- that was the real
+                                misalignment: the header's "Actions" label
+                                hugged the right edge (it's inline text) while
+                                this block element stayed put on the left.
+                                A flex+justify-end wrapper positions it
+                                correctly regardless of what Menu renders. */}
+                            <div className="flex justify-end">
+                              <Menu
+                                align="right"
+                                label={`Actions for ${m.mission_type}`}
+                                trigger={
+                                  <span className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-surface-hover hover:text-foreground">
+                                    <MoreVertical size={15} />
+                                  </span>
+                                }
+                              >
+                                <MenuItem icon={<FileSearch size={14} />} onClick={() => navigate(`/missions/${m.id}`)}>
+                                  View Details
                                 </MenuItem>
-                              )}
-                            </Menu>
+                                {m.status === "created" && (
+                                  <MenuItem
+                                    icon={<Sparkles size={14} />}
+                                    onClick={() => handleRunFullAnalysis(m.id)}
+                                  >
+                                    {runningId === m.id ? "Running…" : "Run Full Analysis"}
+                                  </MenuItem>
+                                )}
+                              </Menu>
+                            </div>
                           </td>
                         </tr>
                       ))}
