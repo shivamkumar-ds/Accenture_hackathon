@@ -249,11 +249,11 @@ export default function Dashboard() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs text-muted-foreground uppercase tracking-wide border-b border-border">
-                        <th className="px-6 py-2.5 font-medium">Tender</th>
-                        <th className="px-3 py-2.5 font-medium hidden sm:table-cell">Uploaded On</th>
-                        <th className="px-3 py-2.5 font-medium">Status</th>
-                        <th className="px-3 py-2.5 font-medium">Evaluation Status</th>
-                        <th className="px-3 py-2.5 font-medium text-right">Actions</th>
+                        <th className="px-6 py-2.5 font-medium whitespace-nowrap">Tender</th>
+                        <th className="px-3 py-2.5 font-medium hidden sm:table-cell whitespace-nowrap">Uploaded On</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Status</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Evaluation Status</th>
+                        <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -270,15 +270,15 @@ export default function Dashboard() {
                           <td className="px-3 py-3 text-muted-foreground tabular-nums hidden sm:table-cell">
                             {new Date(m.created_at).toLocaleDateString()}
                           </td>
-                          <td className="px-3 py-3">
-                            <span className="inline-flex items-center rounded-full bg-info-soft text-info px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="inline-flex items-center rounded-full bg-info-soft text-info px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap">
                               Uploaded
                             </span>
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             <Badge value={m.status} label={EVAL_STATUS_LABEL[m.status]} withIcon />
                           </td>
-                          <td className="px-3 py-3 text-right">
+                          <td className="px-3 py-3 text-right whitespace-nowrap">
                             <Menu
                               align="right"
                               label={`Actions for ${m.mission_type}`}
