@@ -35,3 +35,15 @@ from its two prior lineages.
 
 See `backend/99_DECISIONS_LOG.md` for the complete reasoning trail behind every decision in
 this repository, in order — the actual source of truth for *why*, not just *what*.
+
+## Handing off or exporting this repository
+
+Never zip or copy the working directory directly for a hand-off, review, or support request —
+`backend/.env` and `frontend/.env` are gitignored (never committed), but a plain directory zip
+includes them anyway, since they're still real files on disk. This is exactly how a real
+credential was exposed during the RC-2 engineering audit (see `docs/RC2_FINAL_ENGINEERING_AUDIT.pdf`,
+finding C-1).
+
+Use `./scripts/safe_export.sh` instead. It exports via `git archive`, which can only ever include
+what git is actually tracking — `.env` files, `venv/`, `node_modules/`, and local build output are
+structurally excluded, not just excluded if someone remembers the right flags.
