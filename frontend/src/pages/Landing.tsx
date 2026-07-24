@@ -39,14 +39,14 @@ export default function Landing() {
           aria-hidden="true"
           className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,hsl(var(--primary)/0.10),transparent)]"
         />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-16 lg:pt-20 lg:pb-24 grid lg:grid-cols-2 gap-12 items-start">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-10 lg:pt-10 lg:pb-12 grid lg:grid-cols-2 gap-10 items-start">
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
               AI-Powered Procurement Intelligence
             </span>
 
-            <h1 className="mt-5 text-4xl sm:text-5xl lg:text-[3.4rem] font-bold tracking-tight leading-[1.08] text-foreground">
+            <h1 className="mt-4 text-4xl sm:text-5xl lg:text-[3.3rem] font-bold tracking-tight leading-[1.06] text-foreground">
               From Documents
               <br />
               to Decisions.
@@ -54,12 +54,12 @@ export default function Landing() {
               <span className="text-primary">Organize. Analyze. Automate.</span>
             </h1>
 
-            <p className="mt-5 text-base text-muted-foreground leading-relaxed max-w-xl">
+            <p className="mt-4 text-base text-muted-foreground leading-relaxed max-w-xl">
               BidOps AI helps procurement teams analyze tender documents, build organizational capabilities, evaluate
               compliance, and generate explainable bid recommendations — all from a single enterprise workspace.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               <Button size="lg" onClick={() => (window.location.href = DEMO_MAILTO)} icon={<ArrowRight size={16} />}>
                 Book a Demo
               </Button>
@@ -75,20 +75,6 @@ export default function Landing() {
               <span aria-hidden="true">•</span>
               <span>Built for Procurement Teams</span>
             </p>
-
-            <div className="mt-8 grid sm:grid-cols-2 gap-3">
-              {pills.map((pill) => (
-                <div key={pill.title} className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3.5 shadow-xs transition-shadow hover:shadow-elevated">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <pill.icon size={15} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold tracking-tight">{pill.title}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{pill.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Sticky so the mockup stays pinned near the top of the
@@ -99,13 +85,31 @@ export default function Landing() {
           <div className="lg:sticky lg:top-24">
             <DashboardPreview />
           </div>
+
+          {/* Full-width row, not confined to the half-width left column --
+              spreading these horizontally across the whole page uses the
+              space properly instead of a cramped 2x2 grid with empty
+              space beside it. */}
+          <div className="lg:col-span-2 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {pills.map((pill) => (
+              <div key={pill.title} className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3.5 shadow-xs transition-shadow hover:shadow-elevated">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <pill.icon size={15} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold tracking-tight">{pill.title}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{pill.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Trust row -- capability statements only, no fabricated metrics
           or customer logos (explicit constraint). */}
       <section id="features-anchor" className="border-y border-border bg-surface">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
             {trustStatements.map((t) => (
               <div key={t.label} className="flex flex-col items-center text-center gap-2">
