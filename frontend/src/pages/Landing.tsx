@@ -39,7 +39,7 @@ export default function Landing() {
           aria-hidden="true"
           className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,hsl(var(--primary)/0.10),transparent)]"
         />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-16 lg:pt-20 lg:pb-24 grid lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-16 lg:pt-20 lg:pb-24 grid lg:grid-cols-2 gap-12 items-start">
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -91,7 +91,14 @@ export default function Landing() {
             </div>
           </div>
 
-          <DashboardPreview />
+          {/* Sticky so the mockup stays pinned near the top of the
+              viewport while the (taller) left column scrolls past it,
+              instead of ending early and leaving a block of empty white
+              space beneath a short card -- the actual bug being fixed
+              here, not just cosmetic centering. */}
+          <div className="lg:sticky lg:top-24">
+            <DashboardPreview />
+          </div>
         </div>
       </section>
 
