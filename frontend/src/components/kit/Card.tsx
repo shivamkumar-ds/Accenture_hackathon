@@ -69,16 +69,16 @@ export function StatCard({
 }) {
   return (
     <Card className="p-4 transition-shadow hover:shadow-elevated flex flex-col">
-      <div className="flex items-center gap-2 mb-3">
+      <p className="text-xs font-medium text-muted-foreground leading-tight mb-2.5">{label}</p>
+      <div className="flex items-center gap-3">
         {icon && (
-          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", statToneClasses[tone])}>
+          <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", statToneClasses[tone])}>
             {icon}
           </div>
         )}
-        <p className="text-xs font-medium text-muted-foreground leading-tight">{label}</p>
+        <p className="text-2xl font-bold tracking-tight tabular-nums">{value}</p>
       </div>
-      <p className="text-2xl font-bold tracking-tight tabular-nums">{value}</p>
-      {trend && <p className="text-xs text-muted-foreground mt-0.5">{trend}</p>}
+      {trend && <p className="text-xs text-muted-foreground mt-2">{trend}</p>}
       {linkTo && (
         <Link
           to={linkTo}
