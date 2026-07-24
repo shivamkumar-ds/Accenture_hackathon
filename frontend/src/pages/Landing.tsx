@@ -46,8 +46,10 @@ export default function Landing() {
               AI-Powered Procurement Intelligence
             </span>
 
-            <h1 className="mt-5 font-display text-4xl sm:text-5xl lg:text-[3.25rem] font-semibold tracking-tight leading-[1.1] text-foreground">
-              From Documents to Decisions.
+            <h1 className="mt-5 text-4xl sm:text-5xl lg:text-[3.4rem] font-bold tracking-tight leading-[1.08] text-foreground">
+              From Documents
+              <br />
+              to Decisions.
               <br />
               <span className="text-primary">Organize. Analyze. Automate.</span>
             </h1>
@@ -66,9 +68,17 @@ export default function Landing() {
               </Button>
             </div>
 
-            <div className="mt-10 grid sm:grid-cols-2 gap-3">
+            <p className="mt-4 text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Enterprise-Grade Security</span>
+              <span aria-hidden="true">•</span>
+              <span>Explainable AI Decisions</span>
+              <span aria-hidden="true">•</span>
+              <span>Built for Procurement Teams</span>
+            </p>
+
+            <div className="mt-8 grid sm:grid-cols-2 gap-3">
               {pills.map((pill) => (
-                <div key={pill.title} className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3.5 shadow-xs">
+                <div key={pill.title} className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3.5 shadow-xs transition-shadow hover:shadow-elevated">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                     <pill.icon size={15} />
                   </div>

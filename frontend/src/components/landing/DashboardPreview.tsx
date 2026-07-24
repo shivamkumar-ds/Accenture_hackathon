@@ -27,15 +27,20 @@ export function DashboardPreview() {
           </div>
         </div>
 
-        <div className="flex-1 min-w-0 p-5">
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="h-10 border-b border-border flex items-center justify-end gap-3 px-4 shrink-0">
+            <Search size={12} className="text-muted-foreground" />
+            <Bell size={12} className="text-muted-foreground" />
+            <div className="w-5 h-5 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[9px] font-semibold">
+              A
+            </div>
+          </div>
+
+          <div className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-semibold tracking-tight">Good morning</p>
               <p className="text-[11px] text-muted-foreground">Here's what needs attention today.</p>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Search size={13} />
-              <Bell size={13} />
             </div>
           </div>
 
@@ -84,6 +89,7 @@ export function DashboardPreview() {
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>

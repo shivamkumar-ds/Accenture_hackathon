@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, Menu as MenuIcon, X } from "lucide-react";
+import { CalendarDays, ChevronDown, KeyRound, Menu as MenuIcon, X } from "lucide-react";
 import { Button, Logo } from "../kit";
 import { cn } from "../../lib/cn";
 import { solutions, features, industries, resources, type DropdownCard } from "./landingData";
@@ -212,11 +212,12 @@ export function LandingNavbar() {
 
         <div className="hidden lg:flex items-center gap-2.5 shrink-0">
           <Link to="/login">
-            <Button variant="outline" size="md">
+            <Button variant="outline" size="md" icon={<KeyRound size={14} />}>
               Login
+              <ChevronDown size={12} className="text-muted-foreground" />
             </Button>
           </Link>
-          <Button size="md" onClick={() => (window.location.href = DEMO_MAILTO)}>
+          <Button size="md" icon={<CalendarDays size={14} />} onClick={() => (window.location.href = DEMO_MAILTO)}>
             Book A Demo
           </Button>
         </div>
