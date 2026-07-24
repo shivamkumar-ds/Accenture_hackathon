@@ -12,6 +12,7 @@ then Mission is updated last to point at the finished Recommendation
 and Snapshot.
 """
 
+import logging
 import uuid
 
 from sqlalchemy.orm import Session
@@ -58,6 +59,8 @@ _ENTITY_LABEL_RESOLVERS = {
     ),
 }
 
+logger = logging.getLogger(__name__)
+
 _READ_SCHEMAS_FOR_SNAPSHOT = {
     "certification": CertificationRead,
     "employee": EmployeeRead,
@@ -91,6 +94,7 @@ async def run_evaluation(
     must keep pointing at whatever was actually approved/rejected.
     Default (False) is the original M6/M7/M8 behavior, unchanged.
     """
+    logger.info("Evaluation run starting: mission_id=%s", mission_id)
     mission = mission_service.get_mission(db, mission_id, company_id)
 
     tender = db.query(Tender).filter(Tender.mission_id == mission.id).one_or_none()
@@ -130,6 +134,7 @@ async def run_evaluation(
                 if matched_entity.source_document_id is not None:
                     document_ids_cited.add(matched_entity.source_document_id)
     except Exception as exc:
+        logger.exception("Evaluation run failed: mission_id=%s", mission_id)
         raise ExtractionError(f"Decision evaluation failed for mission '{mission_id}': {exc}") from exc
 
     document_confidences = _document_confidences(db, document_ids_cited)
@@ -208,6 +213,11 @@ async def run_evaluation(
 
     db.commit()
     db.refresh(recommendation)
+    logger.info(
+        "Evaluation run completed: mission_id=%s recommendation_type=%s",
+        mission_id,
+        recommendation_type.value,
+    )
     return recommendation
 
 

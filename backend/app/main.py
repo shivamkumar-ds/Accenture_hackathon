@@ -1,17 +1,25 @@
 """
 BidOps AI — Application entrypoint.
-
-M0 scope: FastAPI app instance + health check only.
-Database, routers, and business logic are added in later milestones.
 """
+
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.logging_config import configure_logging
+
+# Configured before anything else runs, so every logger created below
+# (including the ones module-level `logger = logging.getLogger(__name__)`
+# calls in other modules resolve to at import time) inherits the level and
+# format set here.
+configure_logging()
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
+logger.info("Starting %s (environment=%s)", settings.app_name, settings.app_env)
 
 app = FastAPI(
     title=settings.app_name,

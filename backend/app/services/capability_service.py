@@ -7,6 +7,7 @@ established domain-exception pattern (ExtractionError), consistent with
 every other service in this codebase.
 """
 
+import logging
 import uuid
 from datetime import date, datetime, timezone
 
@@ -18,6 +19,8 @@ from app.models import Certification, Employee, Equipment, FinancialRecord, Proj
 from app.models.enums import CapabilityEntityType, DocumentProcessingStatus, VerificationStatus
 from app.services.document_service import get_document
 from app.services.exceptions import ExtractionError
+
+logger = logging.getLogger(__name__)
 
 # Used only by build_capability_from_document (M3) — deliberately just
 # the three MVP document types with an extraction agent. Do not add
@@ -63,6 +66,11 @@ async def build_capability_from_document(
     try:
         result = await capability_builder.build_capability(file_path, extension, entity_type)
     except Exception as exc:
+        # Covers both document_parser failures and LLM call failures --
+        # build_capability() calls both, and either can land here.
+        logger.exception(
+            "Capability extraction failed: document_id=%s entity_type=%s", document_id, entity_type.value
+        )
         document.processing_status = DocumentProcessingStatus.FAILED
         document.processed_at = datetime.now(timezone.utc)
         db.commit()

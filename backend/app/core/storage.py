@@ -13,6 +13,7 @@ organization aligned with tenant isolation now, and maps directly onto
 an S3 key prefix later (company_id becomes the prefix).
 """
 
+import logging
 import uuid
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from fastapi import UploadFile
 from app.core.config import get_settings
 from app.services.exceptions import FileTooLargeError, UnsupportedFileTypeError
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 STORAGE_ROOT = Path(settings.storage_root)
@@ -38,6 +40,9 @@ ALLOWED_CONTENT_TYPES = {
 def validate_file_type(filename: str, content_type: str | None) -> None:
     extension = Path(filename or "").suffix.lower()
     if extension not in ALLOWED_EXTENSIONS or content_type not in ALLOWED_CONTENT_TYPES:
+        logger.warning(
+            "Upload rejected — unsupported file type: filename=%r content_type=%r", filename, content_type
+        )
         raise UnsupportedFileTypeError(
             f"Unsupported file type: '{filename}' ({content_type}). "
             f"Allowed types: {', '.join(sorted(ALLOWED_EXTENSIONS))}."
@@ -73,6 +78,9 @@ async def save_upload(company_id: uuid.UUID, upload: UploadFile) -> tuple[str, s
                     )
                 out_file.write(chunk)
     except FileTooLargeError:
+        logger.warning(
+            "Upload rejected — exceeded %sMB size limit: company_id=%s", settings.max_upload_size_mb, company_id
+        )
         dest_path.unlink(missing_ok=True)
         raise
 
