@@ -23,6 +23,7 @@ import {
   FileText,
   HelpCircle,
   Cloud,
+  FileUp,
 } from "lucide-react";
 
 // Content for the marketing landing page only -- lives here rather than
@@ -165,6 +166,49 @@ export const features: DropdownCard[] = [
       "Rate limiting on every AI-cost-incurring and authentication endpoint",
       "Token-based authentication on every protected route",
       "Encrypted transport (TLS) for all traffic",
+    ],
+  },
+];
+
+export const howItWorks: DropdownCard[] = [
+  {
+    icon: FileUp,
+    title: "1. Upload",
+    description: "Upload tender documents and company capability records -- certifications, resumes, project history, equipment, financials.",
+    details: [
+      "Handles both text-based and scanned (OCR) PDFs",
+      "Company documents build a reusable capability library, not a one-time upload",
+      "Every document stays scoped to your organization",
+    ],
+  },
+  {
+    icon: Sparkles,
+    title: "2. Extract",
+    description: "AI reads every page and extracts structured, page-attributed requirements and capability data.",
+    details: [
+      "Distinguishes mandatory requirements from informational clauses",
+      "Preserves the exact source page for every extracted item",
+      "Categorizes capability records automatically by entity type",
+    ],
+  },
+  {
+    icon: Layers,
+    title: "3. Match",
+    description: "Every requirement is matched against your capability records, with evidence attached.",
+    details: [
+      "Flags partial or conditional matches, not just yes/no",
+      "Surfaces the exact record used as evidence for each match",
+      "Bounded, concurrent matching keeps evaluation fast on large tenders",
+    ],
+  },
+  {
+    icon: FileBarChart2,
+    title: "4. Decide",
+    description: "Get an explainable GO / NO-GO recommendation with a full evidence trail, exportable as a report.",
+    details: [
+      "Executive summary, confidence breakdown, and full compliance matrix",
+      "Every verdict is paired with a written reason, not a black-box score",
+      "One-click PDF export for offline circulation",
     ],
   },
 ];

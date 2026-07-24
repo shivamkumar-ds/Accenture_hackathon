@@ -123,6 +123,25 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Pricing -- no invented numbers, honest "still finalizing" copy. */}
+      <section id="pricing" className="bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
+          <h2 className="text-2xl font-bold tracking-tight">Pricing</h2>
+          <p className="mt-3 text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
+            Pricing plans are currently being finalized. We're working closely with our early design partners to
+            build pricing that scales with organizations of every size.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+            <Button size="md" onClick={() => (window.location.href = DEMO_MAILTO)}>
+              Request a Demo
+            </Button>
+            <Button variant="outline" size="md" onClick={() => (window.location.href = SALES_MAILTO)}>
+              Contact Sales
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer id="company" className="bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">

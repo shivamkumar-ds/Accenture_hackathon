@@ -3,22 +3,23 @@ import { Link } from "react-router-dom";
 import { CalendarDays, ChevronDown, KeyRound, Menu as MenuIcon, X } from "lucide-react";
 import { Button, Logo } from "../kit";
 import { cn } from "../../lib/cn";
-import { solutions, features, industries, resources, type DropdownCard } from "./landingData";
+import { solutions, features, howItWorks, type DropdownCard } from "./landingData";
 
-type MenuKey = "solutions" | "features" | "industries" | "resources" | "pricing";
+// Trimmed down per explicit founder direction: only Solutions, Features,
+// How It Works, Pricing, Contact -- Industries, Resources, and About
+// (previously in the nav) are gone. The data arrays for Industries/
+// Resources still exist in landingData.ts in case they come back later,
+// they're just not imported/rendered here anymore.
+type DropdownKey = "solutions" | "features" | "how-it-works";
 
-const NAV_ITEMS: { key: MenuKey; label: string }[] = [
+const DROPDOWN_ITEMS: { key: DropdownKey; label: string }[] = [
   { key: "solutions", label: "Solutions" },
   { key: "features", label: "Features" },
-  { key: "industries", label: "Industries" },
-  { key: "resources", label: "Resources" },
-  { key: "pricing", label: "Pricing" },
+  { key: "how-it-works", label: "How It Works" },
 ];
 
 const DEMO_MAILTO =
   "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Demo request — BidOps AI");
-const SALES_MAILTO =
-  "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Sales enquiry — BidOps AI");
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -28,7 +29,7 @@ function CardGrid({ cards }: { cards: DropdownCard[] }) {
   const [expanded, setExpanded] = useState<number | null>(null);
 
   return (
-    <div className="grid sm:grid-cols-2 gap-3">
+    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {cards.map((card, i) => {
         const isOpen = expanded === i;
         return (
@@ -63,7 +64,7 @@ function CardGrid({ cards }: { cards: DropdownCard[] }) {
   );
 }
 
-function MenuPanel({ activeKey }: { activeKey: MenuKey }) {
+function MenuPanel({ activeKey }: { activeKey: DropdownKey }) {
   if (activeKey === "solutions") {
     return (
       <div>
@@ -82,73 +83,17 @@ function MenuPanel({ activeKey }: { activeKey: MenuKey }) {
     );
   }
 
-  if (activeKey === "industries") {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Industries</p>
-        <div className="grid sm:grid-cols-3 gap-3">
-          {industries.map((ind) => (
-            <div key={ind.name} className="rounded-xl border border-border bg-surface p-4 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg bg-brand-accent/10 text-brand-accent flex items-center justify-center shrink-0">
-                <ind.icon size={16} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold tracking-tight">{ind.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{ind.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (activeKey === "resources") {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Resources</p>
-        <div className="grid sm:grid-cols-3 gap-3">
-          {resources.map((r) => (
-            <div key={r.title} className="rounded-xl border border-border bg-surface p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <r.icon size={16} />
-                </div>
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  Coming soon
-                </span>
-              </div>
-              <p className="text-sm font-semibold tracking-tight">{r.title}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{r.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // pricing
+  // how-it-works
   return (
-    <div className="max-w-xl">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Pricing</p>
-      <p className="text-sm text-foreground leading-relaxed">
-        Pricing plans are currently being finalized. We're working closely with our early design partners to build
-        pricing that scales with organizations of every size.
-      </p>
-      <div className="flex flex-wrap gap-3 mt-4">
-        <Button size="md" onClick={() => (window.location.href = DEMO_MAILTO)}>
-          Request a Demo
-        </Button>
-        <Button variant="outline" size="md" onClick={() => (window.location.href = SALES_MAILTO)}>
-          Contact Sales
-        </Button>
-      </div>
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">How It Works</p>
+      <CardGrid cards={howItWorks} />
     </div>
   );
 }
 
 export function LandingNavbar() {
-  const [activeKey, setActiveKey] = useState<MenuKey | null>(null);
+  const [activeKey, setActiveKey] = useState<DropdownKey | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -167,7 +112,7 @@ export function LandingNavbar() {
     };
   }, []);
 
-  function toggle(key: MenuKey) {
+  function toggle(key: DropdownKey) {
     setActiveKey((cur) => (cur === key ? null : key));
   }
 
@@ -180,7 +125,7 @@ export function LandingNavbar() {
         </Link>
 
         <nav className="hidden lg:flex items-center gap-1" aria-label="Primary">
-          {NAV_ITEMS.map((item) => (
+          {DROPDOWN_ITEMS.map((item) => (
             <button
               key={item.key}
               onClick={() => toggle(item.key)}
@@ -197,13 +142,19 @@ export function LandingNavbar() {
             </button>
           ))}
           <button
-            onClick={() => scrollToId("company")}
+            onClick={() => {
+              setActiveKey(null);
+              scrollToId("pricing");
+            }}
             className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-surface-hover"
           >
-            About
+            Pricing
           </button>
           <button
-            onClick={() => scrollToId("contact")}
+            onClick={() => {
+              setActiveKey(null);
+              scrollToId("contact");
+            }}
             className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-surface-hover"
           >
             Contact
@@ -241,7 +192,7 @@ export function LandingNavbar() {
 
       {mobileOpen && (
         <div className="lg:hidden border-t border-border bg-background px-4 py-4 space-y-1 animate-fade-in">
-          {NAV_ITEMS.map((item) => (
+          {DROPDOWN_ITEMS.map((item) => (
             <div key={item.key}>
               <button
                 onClick={() => toggle(item.key)}
@@ -259,12 +210,12 @@ export function LandingNavbar() {
           ))}
           <button
             onClick={() => {
-              scrollToId("company");
+              scrollToId("pricing");
               setMobileOpen(false);
             }}
             className="w-full text-left rounded-md px-3 py-2.5 text-sm font-medium text-foreground/90"
           >
-            About
+            Pricing
           </button>
           <button
             onClick={() => {
