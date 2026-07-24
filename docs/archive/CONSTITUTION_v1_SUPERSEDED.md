@@ -1,3 +1,21 @@
+> **SUPERSEDED — archived during the RC-1 audit (2026-07-24), do not treat as authoritative.**
+>
+> This document predates and was never reconciled with the documents that now actually govern
+> BidOps. Its own "Phase 2 Constitution" section names a frozen roadmap including "M13 — Alibaba
+> Cloud Deployment," which no longer matches reality (OpenAI is the operational default; Vertex/
+> GCP is the strategic pending provider), and its "Source of Truth" precedence order doesn't know
+> either of the documents below exists. Kept here only for historical reference.
+>
+> The current governing documents are:
+> - `docs/PRODUCT_CONSTITUTION.md` — product identity, boundary, and accountability (frozen v1.0)
+> - `docs/DESIGN_SYSTEM.md` — design philosophy and visual system (frozen v1.0)
+> - `docs/ENGINEERING_DIRECTIVE.md` — engineering process and milestone roadmap
+> - `backend/99_DECISIONS_LOG.md` — the actual chronological engineering decision history
+>
+> See `docs/RC1_ENGINEERING_AUDIT.md` finding A2 for the full reasoning behind this archival.
+
+---
+
 # CONSTITUTION.md
 
 # BidOps Engineering Constitution
