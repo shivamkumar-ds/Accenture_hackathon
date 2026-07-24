@@ -9,6 +9,7 @@ consistent with the AI Service Layer / Business Logic Layer separation
 already established in the frozen architecture.
 """
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -54,7 +55,15 @@ REQUIRED_FIELDS = {
 async def build_capability(
     file_path: Path, extension: str, entity_type: CapabilityEntityType
 ) -> BuildResult:
-    parsed = extract_text(file_path, extension)
+    # RC-1 audit finding E1: extract_text()'s OCR fallback path shells out
+    # to Poppler (pdf2image.convert_from_path) and Tesseract
+    # (pytesseract.image_to_string/image_to_data) and blocks until both
+    # return -- multiple seconds for a scanned multi-page document.
+    # asyncio's event loop is single-threaded, so calling this directly
+    # from an async def coroutine would freeze every other concurrent
+    # request (any user's) for that entire duration. asyncio.to_thread
+    # moves it off the event loop.
+    parsed = await asyncio.to_thread(extract_text, file_path, extension)
     if not parsed.text.strip():
         raise ValueError(
             "No extractable text found in document (parsing and OCR both produced empty output)."

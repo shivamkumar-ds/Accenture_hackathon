@@ -14,6 +14,7 @@ short enough to never need chunking, so this logic doesn't try to serve
 both use cases.
 """
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,7 +38,11 @@ class RequirementResult:
 
 
 async def analyze_tender(file_path: Path) -> list[RequirementResult]:
-    pages = extract_pdf_pages(file_path)
+    # RC-1 audit finding E1: extract_pdf_pages() is a synchronous, CPU-bound
+    # call (pypdf parsing over a potentially large multi-page tender). Run
+    # off the event loop via asyncio.to_thread so a single upload can't
+    # stall every other concurrent request for the duration of the parse.
+    pages = await asyncio.to_thread(extract_pdf_pages, file_path)
     if not pages:
         raise ValueError("Tender document has no pages.")
     if not any(page.strip() for page in pages):
