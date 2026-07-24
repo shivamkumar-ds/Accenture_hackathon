@@ -100,7 +100,7 @@ def build_procedural_result(requirement) -> MatchResult:
 
 
 async def match_requirement(
-    requirement, candidates: list[tuple[CapabilityEntityType, object]]
+    requirement, candidates: list[tuple[CapabilityEntityType, object]], provider: str | None = None
 ) -> MatchResult:
     if requirement.requirement_type in PROCEDURAL_CATEGORIES:
         return build_procedural_result(requirement)
@@ -120,7 +120,7 @@ async def match_requirement(
         )
 
     candidate_summaries = [_summarize_entity(entity_type, entity) for entity_type, entity in candidates]
-    client = get_llm_client()
+    client = get_llm_client(provider)
     raw_response = await client.complete(
         decision_matching.SYSTEM_PROMPT,
         decision_matching.build_prompt(requirement.description or "", candidate_summaries),

@@ -180,7 +180,7 @@ def fixtures(db_session):
 @pytest.mark.asyncio
 async def test_evaluation_runs_with_bounded_concurrency(db_session, fixtures, monkeypatch):
     tracker = _TrackingLLMClient(delay=0.05)
-    monkeypatch.setattr(decision_engine, "get_llm_client", lambda: tracker)
+    monkeypatch.setattr(decision_engine, "get_llm_client", lambda *_: tracker)
 
     max_concurrency = get_settings().decision_engine_max_concurrency
 
@@ -228,7 +228,7 @@ async def test_evaluation_preserves_fail_whole_run_semantics(db_session, fixture
     """One failing match still fails the entire evaluation (same behavior
     as the old sequential loop's try/except), not a partial success."""
     tracker = _TrackingLLMClient(delay=0.01, fail_on_call=3)
-    monkeypatch.setattr(decision_engine, "get_llm_client", lambda: tracker)
+    monkeypatch.setattr(decision_engine, "get_llm_client", lambda *_: tracker)
 
     with pytest.raises(ExtractionError):
         await decision_service.run_evaluation(db_session, fixtures["mission"].id, fixtures["company"].id)

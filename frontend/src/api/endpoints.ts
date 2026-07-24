@@ -97,5 +97,11 @@ export const getMission = (missionId: string) =>
 // Mission Orchestrator -- runs Tender Analysis (if not already done) and then
 // Decision Intelligence evaluation, in one call, deciding what's needed from
 // the mission/tender's own authoritative status. One action instead of two.
-export const executeMission = (missionId: string) =>
-  apiClient.post<MissionRead>(`/api/v1/missions/${missionId}/execute`).then((r) => r.data);
+// `provider` selects which LLM engine runs this analysis -- only
+// "openai" is accepted server-side right now (see ExecuteMissionRequest
+// in the backend's mission schema); omitted falls back to the server's
+// configured default, unchanged from before this parameter existed.
+export const executeMission = (missionId: string, provider?: "openai") =>
+  apiClient
+    .post<MissionRead>(`/api/v1/missions/${missionId}/execute`, provider ? { provider } : undefined)
+    .then((r) => r.data);

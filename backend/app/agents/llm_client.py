@@ -633,11 +633,20 @@ class MockLLMClient:
         return generate_mock_response(system_prompt, user_prompt)
 
 
-def get_llm_client() -> LLMClient:
-    if settings.llm_provider == "openai":
+def get_llm_client(provider: str | None = None) -> LLMClient:
+    """`provider` lets a caller override the process-wide LLM_PROVIDER
+    setting for a single call (e.g. a user-selected "Analysis Engine" on
+    a specific tender run) without touching global config. None (the
+    default) preserves the original behavior exactly: fall back to
+    settings.llm_provider. The API layer is responsible for restricting
+    which provider values it actually lets a request choose (see
+    ExecuteMissionRequest in missions.py) -- this factory itself accepts
+    any of the three real providers, same as it always has via settings."""
+    resolved = provider or settings.llm_provider
+    if resolved == "openai":
         return OpenAIClient()
-    if settings.llm_provider == "qwen":
+    if resolved == "qwen":
         return QwenClient()
-    if settings.llm_provider == "gemini":
+    if resolved == "gemini":
         return GeminiClient()
     return MockLLMClient()

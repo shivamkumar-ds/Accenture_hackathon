@@ -37,7 +37,7 @@ class RequirementResult:
     confidence: float
 
 
-async def analyze_tender(file_path: Path) -> list[RequirementResult]:
+async def analyze_tender(file_path: Path, provider: str | None = None) -> list[RequirementResult]:
     # RC-1 audit finding E1: extract_pdf_pages() is a synchronous, CPU-bound
     # call (pypdf parsing over a potentially large multi-page tender). Run
     # off the event loop via asyncio.to_thread so a single upload can't
@@ -55,7 +55,7 @@ async def analyze_tender(file_path: Path) -> list[RequirementResult]:
     all_requirements: list[ExtractedRequirement] = []
     page_had_text: dict[int, bool] = {}
 
-    client = get_llm_client()
+    client = get_llm_client(provider)
 
     for chunk_start in range(0, len(pages), chunk_size):
         chunk_pages = {

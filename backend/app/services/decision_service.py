@@ -86,7 +86,11 @@ def _serialize_capability_graph(entities: list[tuple]) -> dict:
 
 
 async def run_evaluation(
-    db: Session, mission_id: uuid.UUID, company_id: uuid.UUID, preserve_mission_state: bool = False
+    db: Session,
+    mission_id: uuid.UUID,
+    company_id: uuid.UUID,
+    preserve_mission_state: bool = False,
+    provider: str | None = None,
 ) -> Recommendation:
     """
     preserve_mission_state=True (M9 only): every step below still happens
@@ -149,7 +153,7 @@ async def run_evaluation(
                 (entity_type, entity) for entity_type, entity in all_entities if entity_type in domains
             ]
         async with semaphore:
-            result = await decision_engine.match_requirement(requirement, candidates)
+            result = await decision_engine.match_requirement(requirement, candidates, provider=provider)
         return result, candidates
 
     try:

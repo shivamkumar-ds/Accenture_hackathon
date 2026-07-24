@@ -16,7 +16,7 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models import Document, Mission, Tender, User
 from app.schemas.decision import RecommendationRead
-from app.schemas.mission import MissionRead
+from app.schemas.mission import ExecuteMissionRequest, MissionRead
 from app.services import decision_service, mission_service
 from app.services.exceptions import ConflictError, ExtractionError, NotFoundError
 
@@ -92,11 +92,15 @@ def archive_mission(
 @router.post("/{mission_id}/execute", response_model=MissionRead)
 async def execute_mission(
     mission_id: uuid.UUID,
+    payload: ExecuteMissionRequest | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MissionRead:
+    provider = payload.provider if payload else None
     try:
-        return await mission_service.execute_mission(db, mission_id, current_user.company_id, current_user.id)
+        return await mission_service.execute_mission(
+            db, mission_id, current_user.company_id, current_user.id, provider=provider
+        )
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ConflictError as exc:

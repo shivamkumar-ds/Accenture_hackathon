@@ -4,7 +4,7 @@ import { executeMission, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, SkeletonList } from "../components/kit";
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Select, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
 import { tenderDisplayName } from "../lib/tenderName";
 import { ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, Radar } from "lucide-react";
@@ -71,6 +71,11 @@ export default function Missions() {
   const [missions, setMissions] = useState<MissionRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [runningId, setRunningId] = useState<string | null>(null);
+  // Only "openai" is wired up server-side right now (see
+  // ExecuteMissionRequest) -- Gemini/Qwen aren't verified/usable in this
+  // deployment yet, so the selector only offers the one real option
+  // rather than listing choices that would fail.
+  const [provider, setProvider] = useState<"openai">("openai");
   const { notify } = useToast();
   const navigate = useNavigate();
 
@@ -98,7 +103,7 @@ export default function Missions() {
   const handleRunFullAnalysis = async (missionId: string) => {
     setRunningId(missionId);
     try {
-      await executeMission(missionId);
+      await executeMission(missionId, provider);
       notify("success", "Full analysis complete — recommendation generated.");
       navigate(`/missions/${missionId}`);
     } catch (err) {
@@ -162,7 +167,18 @@ export default function Missions() {
                     <MissionStepper status={m.status} />
                   </div>
                   {m.status === "created" && (
-                    <div className="mt-5 pt-4 border-t border-border flex justify-end">
+                    <div className="mt-5 pt-4 border-t border-border flex items-center justify-end gap-2.5">
+                      <span className="text-xs text-muted-foreground">AI Engine</span>
+                      <div className="w-40">
+                        <Select
+                          value={provider}
+                          onChange={(e) => setProvider(e.target.value as "openai")}
+                          className="py-1.5 text-xs"
+                          aria-label="AI engine for this analysis"
+                        >
+                          <option value="openai">OpenAI (GPT)</option>
+                        </Select>
+                      </div>
                       <Button
                         size="sm"
                         loading={runningId === m.id}

@@ -82,7 +82,7 @@ def get_requirements(db: Session, tender_id: uuid.UUID) -> list[Requirement]:
 
 
 async def run_analysis(
-    db: Session, tender_id: uuid.UUID, company_id: uuid.UUID
+    db: Session, tender_id: uuid.UUID, company_id: uuid.UUID, provider: str | None = None
 ) -> tuple[Tender, list[Requirement]]:
     tender = get_tender(db, tender_id, company_id)  # raises NotFoundError if not this company's
 
@@ -93,7 +93,7 @@ async def run_analysis(
     file_path = storage.resolve_path(document.storage_path)
 
     try:
-        results = await tender_analyzer.analyze_tender(file_path)
+        results = await tender_analyzer.analyze_tender(file_path, provider=provider)
     except Exception as exc:
         tender.processing_status = DocumentProcessingStatus.FAILED.value
         db.commit()

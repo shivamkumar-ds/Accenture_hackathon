@@ -53,7 +53,11 @@ def archive_mission(db: Session, mission_id: uuid.UUID, company_id: uuid.UUID) -
 
 
 async def execute_mission(
-    db: Session, mission_id: uuid.UUID, company_id: uuid.UUID, triggered_by: uuid.UUID
+    db: Session,
+    mission_id: uuid.UUID,
+    company_id: uuid.UUID,
+    triggered_by: uuid.UUID,
+    provider: str | None = None,
 ) -> Mission:
     # Imported locally, not at module level, to avoid a circular import:
     # decision_service now imports mission_service.get_mission (consolidating
@@ -86,7 +90,7 @@ async def execute_mission(
             f"Tender analysis required (current status: '{tender.processing_status}') — running",
         )
         try:
-            await tender_service.run_analysis(db, tender.id, company_id)
+            await tender_service.run_analysis(db, tender.id, company_id, provider=provider)
             analysis_ran = True
             _log(db, mission.id, triggered_by, TENDER_ANALYSIS_AGENT, "Tender analysis completed")
         except ExtractionError as exc:
@@ -103,7 +107,7 @@ async def execute_mission(
     if needs_evaluation:
         _log(db, mission.id, triggered_by, DECISION_ENGINE_AGENT, "Running evaluation")
         try:
-            await decision_service.run_evaluation(db, mission.id, company_id)
+            await decision_service.run_evaluation(db, mission.id, company_id, provider=provider)
             _log(db, mission.id, triggered_by, DECISION_ENGINE_AGENT, "Evaluation completed")
         except ExtractionError as exc:
             mission.status = MissionStatus.CREATED
