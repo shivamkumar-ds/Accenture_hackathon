@@ -402,7 +402,7 @@ export const processSteps: ProcessStep[] = [
     step: 4,
     icon: Sparkles,
     title: "AI Extracts Requirements",
-    description: "BidOps AI extracts and classifies all requirements, clauses, and eligibility criteria automatically.",
+    description: "BidOps extracts and classifies all requirements, clauses, and eligibility criteria automatically.",
     color: { bg: "bg-orange-50", text: "text-orange-600" },
   },
   {
@@ -494,11 +494,11 @@ export interface ResourceItem {
 }
 
 export const resources: ResourceItem[] = [
-  { icon: BookOpen, title: "Documentation", description: "Step-by-step guidance on using BidOps AI. Coming soon." },
+  { icon: BookOpen, title: "Documentation", description: "Step-by-step guidance on using BidOps. Coming soon." },
   { icon: FileText, title: "Product Overview", description: "A walkthrough of the platform end to end. Coming soon." },
   { icon: HelpCircle, title: "FAQ", description: "Answers to common questions about the platform. Coming soon." },
-  { icon: ShieldCheck, title: "Security", description: "Details on how BidOps AI handles data and access. Coming soon." },
-  { icon: Sparkles, title: "Release Notes", description: "What's new in BidOps AI, as it ships. Coming soon." },
+  { icon: ShieldCheck, title: "Security", description: "Details on how BidOps handles data and access. Coming soon." },
+  { icon: Sparkles, title: "Release Notes", description: "What's new in BidOps, as it ships. Coming soon." },
 ];
 
 export const trustStatements: { icon: LucideIcon; label: string }[] = [

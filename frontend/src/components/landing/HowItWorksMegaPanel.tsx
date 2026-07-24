@@ -27,7 +27,7 @@ export function HowItWorksMegaPanel() {
           From Documents to Decisions
         </h2>
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
-          BidOps AI follows a proven, AI-powered workflow to evaluate tenders, assess your capabilities, and deliver
+          BidOps follows a proven, AI-powered workflow to evaluate tenders, assess your capabilities, and deliver
           clear, evidence-backed recommendations.
         </p>
       </div>

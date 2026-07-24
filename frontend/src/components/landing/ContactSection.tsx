@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Briefcase, CalendarDays, Headphones, Lock, Mail, MessageSquare, Send, ShieldCheck } from "lucide-react";
+import { ArrowRight, Headphones, Mail, MessageSquare, Send, ShieldCheck } from "lucide-react";
 import { Button, Input, Select } from "../kit";
 
 // Real, already-established contact channel used everywhere else on the
@@ -7,7 +7,7 @@ import { Button, Input, Select } from "../kit";
 // address here -- neither exists to publish honestly yet, so those two
 // items from the reference layout are left out rather than fabricated.
 const CONTACT_EMAIL = "bidops.ai@gmail.com";
-const DEMO_MAILTO = "mailto:" + CONTACT_EMAIL + "?subject=" + encodeURIComponent("Demo request — BidOps AI");
+const DEMO_MAILTO = "mailto:" + CONTACT_EMAIL + "?subject=" + encodeURIComponent("Demo request — BidOps");
 
 const contactMethods = [
   {
@@ -26,7 +26,7 @@ const contactMethods = [
     title: "Request a Demo",
     body: (
       <div>
-        <p className="text-sm text-muted-foreground">See BidOps AI in action with a personalized walkthrough.</p>
+        <p className="text-sm text-muted-foreground">See BidOps in action with a personalized walkthrough.</p>
         <a
           href={DEMO_MAILTO}
           className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1 mt-1"
@@ -36,12 +36,6 @@ const contactMethods = [
       </div>
     ),
   },
-];
-
-const bottomTrust = [
-  { icon: ShieldCheck, title: "Enterprise Grade", subtitle: "Security" },
-  { icon: Lock, title: "Your Data is", subtitle: "Always Private" },
-  { icon: Briefcase, title: "Designed for", subtitle: "Procurement Teams" },
 ];
 
 const initialForm = {
@@ -73,7 +67,7 @@ export function ContactSection() {
     ].join("\n");
     const mailto =
       `mailto:${CONTACT_EMAIL}?subject=` +
-      encodeURIComponent(form.subject || "Contact form inquiry — BidOps AI") +
+      encodeURIComponent(form.subject || "Contact form inquiry — BidOps") +
       `&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
   }
@@ -92,7 +86,7 @@ export function ContactSection() {
               We're Here to Help
             </h2>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-md">
-              Have questions about BidOps AI? Want to see it in action? Our team is ready to help you make confident
+              Have questions about BidOps? Want to see it in action? Our team is ready to help you make confident
               procurement decisions.
             </p>
 
@@ -196,36 +190,6 @@ export function ContactSection() {
                 Send Message
               </Button>
             </form>
-          </div>
-        </div>
-
-        {/* Bottom banner */}
-        <div className="mt-10 rounded-2xl border border-border bg-surface px-6 py-6 flex flex-col lg:flex-row items-center gap-6">
-          <div className="flex-1 text-center lg:text-left">
-            <p className="text-base font-bold text-foreground">Prefer a quick chat?</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Schedule a personalized demo with our experts and see how BidOps AI can transform your tender
-              evaluation process.
-            </p>
-          </div>
-
-          <Button size="md" icon={<CalendarDays size={14} />} onClick={() => (window.location.href = DEMO_MAILTO)} className="shrink-0">
-            Book a Demo
-          </Button>
-
-          <div className="flex items-center gap-6 shrink-0">
-            {bottomTrust.map((t) => (
-              <div key={t.title} className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <t.icon size={15} />
-                </div>
-                <p className="text-xs font-medium text-foreground/80 leading-snug">
-                  {t.title}
-                  <br />
-                  {t.subtitle}
-                </p>
-              </div>
-            ))}
           </div>
         </div>
       </div>

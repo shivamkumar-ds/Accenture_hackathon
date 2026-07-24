@@ -1,4 +1,4 @@
-# BidOps AI — Frontend
+# BidOps — Frontend
 
 ## Housekeeping — delete two dead files first
 

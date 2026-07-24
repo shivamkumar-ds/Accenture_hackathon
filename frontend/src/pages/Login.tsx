@@ -106,7 +106,7 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="relative text-xs text-brand-foreground/40">© 2026 BidOps AI. Built for regulated procurement.</p>
+        <p className="relative text-xs text-brand-foreground/40">© 2026 BidOps. Built for regulated procurement.</p>
       </div>
 
       {/* Form panel */}
@@ -173,7 +173,7 @@ export default function Login() {
           )}
 
           <p className="text-sm text-center text-muted-foreground mt-6">
-            {mode === "login" ? "New to BidOps AI? " : "Already registered? "}
+            {mode === "login" ? "New to BidOps? " : "Already registered? "}
             <button
               onClick={() => setMode(mode === "login" ? "register" : "login")}
               className="text-primary font-medium hover:underline"

@@ -20,7 +20,7 @@ export function LogoMark({ size = 28 }: { size?: number }) {
   const gradientId = useId();
 
   return (
-    // aria-hidden: decorative when paired with the "BidOps AI" wordmark
+    // aria-hidden: decorative when paired with the "BidOps" wordmark
     // (Logo, below) that already conveys the same information as text --
     // RC-1 audit finding C1. Where LogoMark is ever used alone with no
     // adjacent text, a caller should add its own aria-label instead.
@@ -61,9 +61,7 @@ export function Logo({ size = 22, wordmarkClassName = "" }: { size?: number; wor
   return (
     <div className="flex items-center gap-2">
       <LogoMark size={size} />
-      <span className={`font-semibold tracking-tight ${wordmarkClassName}`}>
-        BidOps <span className="text-brand-accent">AI</span>
-      </span>
+      <span className={`font-semibold tracking-tight ${wordmarkClassName}`}>BidOps</span>
     </div>
   );
 }

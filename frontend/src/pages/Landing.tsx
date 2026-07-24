@@ -5,7 +5,7 @@ import { DashboardPreview } from "../components/landing/DashboardPreview";
 import { ContactSection } from "../components/landing/ContactSection";
 import { trustStatements } from "../components/landing/landingData";
 
-const DEMO_MAILTO = "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Demo request — BidOps AI");
+const DEMO_MAILTO = "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Demo request — BidOps");
 
 const pills = [
   { icon: FileSearch, title: "AI Requirement Extraction", description: "Automatically extract tender requirements using AI." },
@@ -54,7 +54,7 @@ export default function Landing() {
             </h1>
 
             <p className="mt-4 text-base text-muted-foreground leading-relaxed max-w-xl">
-              BidOps AI helps procurement teams analyze tender documents, build organizational capabilities, evaluate
+              BidOps helps procurement teams analyze tender documents, build organizational capabilities, evaluate
               compliance, and generate explainable bid recommendations — all from a single enterprise workspace.
             </p>
 
@@ -128,7 +128,7 @@ export default function Landing() {
             <div>
               <Logo size={22} />
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed max-w-xs">
-                BidOps AI is the end-to-end platform that helps procurement teams discover the right tenders, analyze
+                BidOps is the end-to-end platform that helps procurement teams discover the right tenders, analyze
                 complex documents, build capabilities, and generate compliant bids with confidence.
               </p>
             </div>
@@ -157,7 +157,7 @@ export default function Landing() {
           </div>
 
           <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">© 2026 BidOps AI. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">© 2026 BidOps. All rights reserved.</p>
             <div className="flex items-center gap-5">
               <span className="text-xs text-muted-foreground">Privacy Policy</span>
               <span className="text-xs text-muted-foreground">Terms</span>

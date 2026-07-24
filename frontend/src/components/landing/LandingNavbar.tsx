@@ -21,7 +21,7 @@ const DROPDOWN_ITEMS: { key: DropdownKey; label: string }[] = [
 ];
 
 const DEMO_MAILTO =
-  "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Demo request — BidOps AI");
+  "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Demo request — BidOps");
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });

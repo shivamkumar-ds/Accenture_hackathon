@@ -3,7 +3,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { solutionVerticals } from "./landingData";
 
-const DEMO_MAILTO = "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Demo request — BidOps AI");
+const DEMO_MAILTO = "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Demo request — BidOps");
 
 export function SolutionsMegaPanel() {
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -19,7 +19,7 @@ export function SolutionsMegaPanel() {
           Solutions That Fit the Way You Work
         </h2>
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
-          BidOps AI adapts to your industry, your team size, and your procurement complexity — helping you evaluate
+          BidOps adapts to your industry, your team size, and your procurement complexity — helping you evaluate
           tenders with clarity and confidence.
         </p>
       </div>
@@ -67,7 +67,7 @@ export function SolutionsMegaPanel() {
           </div>
           <p className="text-sm text-foreground">
             <span className="font-semibold">Not sure where you fit?</span>{" "}
-            <span className="text-muted-foreground">BidOps AI is flexible and adapts to your unique procurement process.</span>
+            <span className="text-muted-foreground">BidOps is flexible and adapts to your unique procurement process.</span>
           </p>
         </div>
         <a

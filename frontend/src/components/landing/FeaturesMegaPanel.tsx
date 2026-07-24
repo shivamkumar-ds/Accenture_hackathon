@@ -24,7 +24,7 @@ export function FeaturesMegaPanel() {
           Everything You Need to Win More Tenders.
         </h2>
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
-          BidOps AI brings together document intelligence, capability management, compliance automation, and
+          BidOps brings together document intelligence, capability management, compliance automation, and
           decision intelligence in a single platform designed for modern procurement teams.
         </p>
       </div>

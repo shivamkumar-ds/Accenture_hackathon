@@ -39,7 +39,7 @@ export default function Layout() {
 
   const currentLabel =
     navItems.find((item) => (item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to)))
-      ?.label ?? "BidOps AI";
+      ?.label ?? "BidOps";
 
   return (
     <div className="min-h-screen flex bg-background">
