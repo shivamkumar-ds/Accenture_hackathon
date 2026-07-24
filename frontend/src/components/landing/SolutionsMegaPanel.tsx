@@ -10,15 +10,15 @@ export function SolutionsMegaPanel() {
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="text-center mb-8">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
           <Sparkles size={12} />
           Solutions built for every procurement need
         </span>
-        <h2 className="mt-4 text-2xl lg:text-3xl font-bold tracking-tight leading-[1.1] text-foreground lg:whitespace-nowrap">
+        <h2 className="mt-4 text-2xl lg:text-3xl font-bold tracking-tight leading-[1.1] text-foreground">
           Solutions That Fit the Way You Work
         </h2>
-        <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-lg">
+        <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
           BidOps AI adapts to your industry, your team size, and your procurement complexity — helping you evaluate
           tenders with clarity and confidence.
         </p>
