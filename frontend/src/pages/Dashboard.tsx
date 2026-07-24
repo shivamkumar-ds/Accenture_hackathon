@@ -211,12 +211,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader
-              title="Recent Tenders"
-              action={
+      <div className="space-y-6">
+        <Card>
+          <CardHeader
+            title="Recent Tenders"
+            action={
                 <Link
                   to="/tenders/new"
                   className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors shrink-0"
@@ -315,10 +314,9 @@ export default function Dashboard() {
                 </Link>
               </div>
             )}
-          </Card>
-        </div>
+        </Card>
 
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {/* Honest by design: the backend only tracks mission status at one
               granularity (created/running/awaiting_approval/completed/
               archived) -- there's no field for step-by-step progress or a
