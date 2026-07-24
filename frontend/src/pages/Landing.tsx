@@ -62,9 +62,6 @@ export default function Landing() {
               <Button size="lg" onClick={() => (window.location.href = DEMO_MAILTO)} icon={<ArrowRight size={16} />}>
                 Book a Demo
               </Button>
-              <Button variant="outline" size="lg" onClick={() => scrollToId("features-anchor")}>
-                Explore Features
-              </Button>
             </div>
 
             <p className="mt-4 text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
