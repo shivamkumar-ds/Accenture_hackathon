@@ -15,6 +15,7 @@ import {
   CardHeader,
   ConfidenceBar,
   ConfidenceRing,
+  EmptyState,
   FilterChip,
   SearchInput,
   Skeleton,
@@ -150,19 +151,12 @@ export default function Evaluation() {
         </div>
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center text-center py-10">
-              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
-                <TrendingUp size={20} />
-              </div>
-              <h3 className="text-sm font-semibold">This mission hasn't been evaluated yet</h3>
-              <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                Run the Decision Engine to match requirements against your capability library and generate a
-                recommendation.
-              </p>
-              <Button onClick={handleRun} className="mt-4">
-                Run Evaluation
-              </Button>
-            </div>
+            <EmptyState
+              icon={TrendingUp}
+              title="This mission hasn't been evaluated yet"
+              description="Run the Decision Engine to match requirements against your capability library and generate a recommendation."
+              action={<Button onClick={handleRun}>Run Evaluation</Button>}
+            />
           </CardBody>
         </Card>
       </div>

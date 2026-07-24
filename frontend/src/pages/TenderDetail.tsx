@@ -11,6 +11,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  EmptyState,
   FilterChip,
   Skeleton,
 } from "../components/kit";
@@ -139,18 +140,12 @@ export default function TenderDetail() {
       ) : requirements.length === 0 ? (
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center text-center py-10">
-              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
-                <FileSearch size={20} />
-              </div>
-              <h3 className="text-sm font-semibold">Ready to analyze</h3>
-              <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                Run the Tender Analyzer to extract requirements from this document.
-              </p>
-              <Button onClick={handleAnalyze} className="mt-4">
-                Run Tender Analyzer
-              </Button>
-            </div>
+            <EmptyState
+              icon={FileSearch}
+              title="Ready to analyze"
+              description="Run the Tender Analyzer to extract requirements from this document."
+              action={<Button onClick={handleAnalyze}>Run Tender Analyzer</Button>}
+            />
           </CardBody>
         </Card>
       ) : (
