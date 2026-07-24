@@ -11,12 +11,13 @@ assembly function, since both are in the frozen, approved spec.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models import User
 from app.schemas.decision import ComplianceMatrixEntryRead, EvaluationResponse, GapAnalysisEntry, RecommendationRead
 from app.services import decision_service
@@ -67,8 +68,13 @@ def _build_response(db: Session, recommendation, compliance_rows, requirements_b
     )
 
 
+# 10/minute per IP (RC-2 finding H-2) — one call here is up to N sequential/
+# parallelized LLM requests (one per tender requirement), the single most
+# expensive endpoint in the product per invocation.
 @evaluation_router.post("/run", response_model=EvaluationResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def run_evaluation(
+    request: Request,
     payload: RunEvaluationRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

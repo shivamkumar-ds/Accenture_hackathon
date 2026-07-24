@@ -6,13 +6,14 @@ tenant's, regardless of role.
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core import storage
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models import User
 from app.schemas.document import DocumentRead
 from app.services import document_service
@@ -21,8 +22,12 @@ from app.services.exceptions import FileTooLargeError, NotFoundError, Unsupporte
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
+# 20/minute per IP (RC-2 finding H-2) — every upload costs real disk space
+# and, for capability documents, a downstream LLM extraction call.
 @router.post("/upload", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def upload_document(
+    request: Request,
     document_type: str = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),

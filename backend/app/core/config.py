@@ -152,6 +152,16 @@ class Settings(BaseSettings):
     # the proposed default, configurable rather than hardcoded.
     max_optional_review_items: int = 2
 
+    # Decision Engine concurrency (RC-2 remediation): bounded, not unlimited
+    # — caps how many per-requirement LLM matches run in parallel during one
+    # evaluation. See app/services/decision_service.py::run_evaluation().
+    decision_engine_max_concurrency: int = 5
+
+    # Rate limiting (RC-2 audit finding H-2). On by default everywhere;
+    # the test suite sets this false via a fixture so repeated calls in a
+    # single test run are never throttled by accident.
+    rate_limit_enabled: bool = True
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @model_validator(mode="after")

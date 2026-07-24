@@ -23,3 +23,7 @@ google-genai==2.12.1
 # provider layer (see tests/agents/test_llm_client.py).
 pytest==8.3.4
 pytest-asyncio==0.25.2
+
+# Rate limiting (RC-2 audit finding H-2) — protects account creation and
+# every LLM-cost-incurring endpoint from unlimited/free abuse.
+slowapi==0.1.10

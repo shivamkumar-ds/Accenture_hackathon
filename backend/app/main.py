@@ -6,10 +6,14 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.logging_config import configure_logging
+from app.core.rate_limit import limiter
 
 # Configured before anything else runs, so every logger created below
 # (including the ones module-level `logger = logging.getLogger(__name__)`
@@ -44,6 +48,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting (RC-2 audit finding H-2) — the limiter instance and its
+# per-route limits live in app/core/rate_limit.py and each decorated route;
+# this is just the app-level wiring slowapi requires: register the shared
+# limiter, translate an exceeded limit into a proper 429 response, and add
+# the middleware that attaches rate-limit headers to responses.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(api_router, prefix="/api/v1")
 

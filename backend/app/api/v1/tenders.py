@@ -10,12 +10,13 @@ nested under a shared prefix.
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models import User
 from app.schemas.tender import (
     RequirementRead,
@@ -30,10 +31,13 @@ tenders_router = APIRouter(prefix="/tenders", tags=["tenders"])
 analysis_router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 
+# 20/minute per IP (RC-2 finding H-2) — same reasoning as /documents/upload.
 @tenders_router.post(
     "/upload", response_model=TenderUploadResult, status_code=status.HTTP_201_CREATED
 )
+@limiter.limit("20/minute")
 async def upload_tender(
+    request: Request,
     file: UploadFile = File(...),
     tender_name: str | None = Form(None),
     organization: str | None = Form(None),
@@ -83,8 +87,13 @@ class RunAnalysisRequest(BaseModel):
     tender_id: uuid.UUID
 
 
+# 10/minute per IP (RC-2 finding H-2) — this triggers a real LLM call per
+# tender-page chunk; the single most expensive endpoint per invocation
+# after decision evaluation itself.
 @analysis_router.post("/run", response_model=TenderWithRequirements)
+@limiter.limit("10/minute")
 async def run_analysis(
+    request: Request,
     payload: RunAnalysisRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

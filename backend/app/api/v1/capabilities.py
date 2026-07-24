@@ -12,12 +12,13 @@ tables, not a new storage model — see 99_DECISIONS_LOG.md (D-112).
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_administrator
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models import User
 from app.models.enums import CapabilityEntityType
 from app.schemas.capability import (
@@ -63,8 +64,11 @@ def _serialize(entity_type: CapabilityEntityType, entity) -> CapabilityBuildResu
     return CapabilityBuildResult(entity_type=entity_type, entity=schema_cls.model_validate(entity))
 
 
+# 20/minute per IP (RC-2 finding H-2) — real LLM extraction call per invocation.
 @router.post("/build", response_model=CapabilityBuildResult, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def build_capability(
+    request: Request,
     payload: BuildCapabilityRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
