@@ -1,0 +1,38 @@
+# Root-level .gitignore for the canonical repository. Comprehensive on its
+# own — not relying solely on backend/.gitignore or frontend/.gitignore,
+# since tooling can run from the repo root regardless of which subtree it
+# targets. None of these patterns need a leading slash or `**/` prefix:
+# git applies a pattern with no internal slash at every directory depth.
+
+# Secrets — no real .env is ever tracked, only .env.example.
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Dependencies / build output
+node_modules/
+dist/
+dist-ssr/
+build/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+venv/
+.venv/
+
+# Coverage / test artifacts
+coverage/
+.coverage
+htmlcov/
+
+# Editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+*.local

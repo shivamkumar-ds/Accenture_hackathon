@@ -1,0 +1,53 @@
+"""Pydantic schemas for the Human Approval Layer."""
+
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, model_validator
+
+from app.models.enums import ComplianceMatrixVerificationStatus, RecommendationType
+from app.schemas.decision import ComplianceMatrixEntryRead, RecommendationRead
+from app.schemas.mission import MissionRead
+
+
+class VerifyComplianceRequest(BaseModel):
+    """A human's own determination on a specific flagged compliance row —
+    not a checkbox, a recorded judgment. PENDING is not a valid target
+    value here; that's the starting state, not something a human "verifies" to."""
+
+    verification_status: ComplianceMatrixVerificationStatus
+    note: str | None = None
+
+    @model_validator(mode="after")
+    def _reject_pending(self) -> "VerifyComplianceRequest":
+        if self.verification_status == ComplianceMatrixVerificationStatus.PENDING:
+            raise ValueError("verification_status must be a real determination, not PENDING.")
+        return self
+
+
+class ApprovalDecisionRequest(BaseModel):
+    mission_id: uuid.UUID
+    decision: RecommendationType
+    reason: str | None = None
+
+    @model_validator(mode="after")
+    def _require_reason_for_no_go(self) -> "ApprovalDecisionRequest":
+        if self.decision == RecommendationType.NO_GO and not (self.reason and self.reason.strip()):
+            raise ValueError("A reason is required when the decision is NO_GO.")
+        return self
+
+
+class DecisionEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: uuid.UUID | None
+    event: str
+    result: str | None
+    timestamp: datetime
+
+
+class ApprovalHistoryResponse(BaseModel):
+    mission: MissionRead
+    recommendation: RecommendationRead
+    compliance_matrix: list[ComplianceMatrixEntryRead]
+    decision_events: list[DecisionEventRead]

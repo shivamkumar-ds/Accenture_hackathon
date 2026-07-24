@@ -1,0 +1,332 @@
+"""
+Decision service — persistence layer for Decision Intelligence.
+
+Ordering matters here and is worth stating explicitly: ComplianceMatrix.
+recommendation_id is NOT NULL, so the Recommendation row must exist
+before any ComplianceMatrix row can be written. All reasoning (LLM
+matching, freshness overrides, confidence propagation) happens first,
+entirely in memory via decision_engine — only once every result is known
+do we start writing to the database, in this order: CapabilitySnapshot,
+Recommendation, CapabilityMapping (per cited entity), ComplianceMatrix,
+then Mission is updated last to point at the finished Recommendation
+and Snapshot.
+"""
+
+import uuid
+
+from sqlalchemy.orm import Session
+
+from app.agents import decision_engine
+from app.models import (
+    CapabilityMapping,
+    CapabilitySnapshot,
+    Certification,
+    ComplianceMatrix,
+    Document,
+    Employee,
+    Equipment,
+    FinancialRecord,
+    Project,
+    Recommendation,
+    Tender,
+)
+from app.models.enums import CapabilityEntityType, ComplianceMatrixVerificationStatus, MissionStatus
+from app.schemas.capability import (
+    CertificationRead,
+    EmployeeRead,
+    EquipmentRead,
+    FinancialRecordRead,
+    ProjectRead,
+)
+from app.schemas.decision import EvidenceSourceRead
+from app.services import capability_service, mission_service
+from app.services.exceptions import ExtractionError, NotFoundError
+
+# entity_type -> (ORM model, display-label function). Same polymorphic shape
+# revalidation_service.py already relies on (CapabilityMapping.capability_entity_type
+# + capability_entity_id), just resolved to a human-readable label here instead of
+# used for dependency traversal. FinancialRecord has no name-ish field, so it gets a
+# synthesized label instead of a real fallback name.
+_ENTITY_LABEL_RESOLVERS = {
+    CapabilityEntityType.CERTIFICATION: (Certification, lambda e: e.certification_name),
+    CapabilityEntityType.EMPLOYEE: (Employee, lambda e: e.name),
+    CapabilityEntityType.PROJECT: (Project, lambda e: e.client or "Project record"),
+    CapabilityEntityType.EQUIPMENT: (Equipment, lambda e: e.equipment_name),
+    CapabilityEntityType.FINANCIAL_RECORD: (
+        FinancialRecord,
+        lambda e: f"Financial record ({e.financial_year})" if e.financial_year else "Financial record",
+    ),
+}
+
+_READ_SCHEMAS_FOR_SNAPSHOT = {
+    "certification": CertificationRead,
+    "employee": EmployeeRead,
+    "project": ProjectRead,
+    "equipment": EquipmentRead,
+    "financial_record": FinancialRecordRead,
+}
+
+
+def _serialize_capability_graph(entities: list[tuple]) -> dict:
+    """JSON-able snapshot of the full capability graph at evaluation time —
+    every entity, not just the ones cited as evidence (matches 07's own
+    description of what a Capability Snapshot contains)."""
+    grouped: dict[str, list[dict]] = {key: [] for key in _READ_SCHEMAS_FOR_SNAPSHOT}
+    for entity_type, entity in entities:
+        schema_cls = _READ_SCHEMAS_FOR_SNAPSHOT[entity_type.value]
+        grouped[entity_type.value].append(schema_cls.model_validate(entity).model_dump(mode="json"))
+    return grouped
+
+
+async def run_evaluation(
+    db: Session, mission_id: uuid.UUID, company_id: uuid.UUID, preserve_mission_state: bool = False
+) -> Recommendation:
+    """
+    preserve_mission_state=True (M9 only): every step below still happens
+    identically — new CapabilitySnapshot, new Recommendation, new
+    CapabilityMapping/ComplianceMatrix rows — but the final Mission
+    mutation is skipped. Used specifically when revalidating a mission
+    that a human has already decided on: the new Recommendation exists
+    for current operational awareness, but Mission.status/recommendation_id
+    must keep pointing at whatever was actually approved/rejected.
+    Default (False) is the original M6/M7/M8 behavior, unchanged.
+    """
+    mission = mission_service.get_mission(db, mission_id, company_id)
+
+    tender = db.query(Tender).filter(Tender.mission_id == mission.id).one_or_none()
+    if tender is None:
+        raise NotFoundError(f"No tender found for mission '{mission_id}'.")
+
+    from app.models import Requirement
+
+    requirements = db.query(Requirement).filter(Requirement.tender_id == tender.id).all()
+    if not requirements:
+        raise ExtractionError(
+            f"Tender '{tender.id}' has no extracted requirements — run tender analysis first."
+        )
+
+    all_entities = capability_service.list_capabilities(db, company_id)
+
+    results = []
+    entity_confidences: list[float] = []
+    document_ids_cited: set[uuid.UUID] = set()
+
+    try:
+        for requirement in requirements:
+            if requirement.requirement_type in decision_engine.PROCEDURAL_CATEGORIES:
+                candidates = []
+            else:
+                domains = decision_engine.CATEGORY_DOMAINS[requirement.requirement_type]
+                candidates = [
+                    (entity_type, entity) for entity_type, entity in all_entities if entity_type in domains
+                ]
+            result = await decision_engine.match_requirement(requirement, candidates)
+            results.append(result)
+
+            if result.matched_entity_id is not None:
+                matched_entity = next(e for t, e in candidates if e.id == result.matched_entity_id)
+                if matched_entity.confidence_score is not None:
+                    entity_confidences.append(float(matched_entity.confidence_score))
+                if matched_entity.source_document_id is not None:
+                    document_ids_cited.add(matched_entity.source_document_id)
+    except Exception as exc:
+        raise ExtractionError(f"Decision evaluation failed for mission '{mission_id}': {exc}") from exc
+
+    document_confidences = _document_confidences(db, document_ids_cited)
+
+    recommendation_type = decision_engine.compute_recommendation_type(results)
+    confidence = decision_engine.compute_confidence_propagation(results, entity_confidences, document_confidences)
+    executive_summary = decision_engine.build_executive_summary(recommendation_type, results, confidence)
+    recommendation_risk = decision_engine.RECOMMENDATION_RISK_MAP[recommendation_type]
+
+    existing_snapshot_count = (
+        db.query(CapabilitySnapshot).filter(CapabilitySnapshot.mission_id == mission.id).count()
+    )
+    snapshot = CapabilitySnapshot(
+        mission_id=mission.id,
+        snapshot_version=existing_snapshot_count + 1,
+        snapshot_data=_serialize_capability_graph(all_entities),
+        generated_by="decision_engine",
+    )
+    db.add(snapshot)
+    db.flush()
+
+    recommendation = Recommendation(
+        mission_id=mission.id,
+        recommendation_type=recommendation_type,
+        executive_summary=executive_summary,
+        risk_level=recommendation_risk,
+        document_confidence=confidence["document_confidence"],
+        entity_confidence=confidence["entity_confidence"],
+        matching_confidence=confidence["matching_confidence"],
+        recommendation_confidence=confidence["recommendation_confidence"],
+        overall_confidence=confidence["overall_confidence"],
+        snapshot_id=snapshot.id,
+    )
+    db.add(recommendation)
+    db.flush()
+
+    for result in results:
+        mapping_id = None
+        if result.matched_entity_id is not None:
+            mapping = CapabilityMapping(
+                requirement_id=result.requirement_id,
+                capability_entity_type=result.matched_entity_type,
+                capability_entity_id=result.matched_entity_id,
+                match_status=result.status,
+                evidence=result.notes,
+                confidence=result.matching_confidence,
+            )
+            db.add(mapping)
+            db.flush()
+            mapping_id = mapping.id
+
+        risk_level = decision_engine.compute_risk_level(result.mandatory, result.status)
+        requires_verification, verification_reason = decision_engine.compute_requires_verification(
+            result.mandatory, result.status, result.matching_confidence
+        )
+
+        compliance_row = ComplianceMatrix(
+            recommendation_id=recommendation.id,
+            requirement_id=result.requirement_id,
+            status=result.status,
+            supporting_evidence=result.supporting_evidence,
+            notes=result.notes,
+            requires_verification=requires_verification,
+            verification_reason=verification_reason,
+            risk_level=risk_level,
+            verification_status=ComplianceMatrixVerificationStatus.PENDING,
+            matching_confidence=result.matching_confidence,
+            evidence_reference=mapping_id,
+        )
+        db.add(compliance_row)
+
+    if not preserve_mission_state:
+        mission.recommendation_id = recommendation.id
+        mission.capability_snapshot_id = snapshot.id
+        mission.status = MissionStatus.AWAITING_APPROVAL
+
+    db.commit()
+    db.refresh(recommendation)
+    return recommendation
+
+
+def _document_confidences(db: Session, document_ids: set[uuid.UUID]) -> list[float]:
+    if not document_ids:
+        return []
+    from app.models import Document
+
+    rows = db.query(Document).filter(Document.id.in_(document_ids)).all()
+    return [float(d.extraction_confidence) for d in rows if d.extraction_confidence is not None]
+
+
+def get_recommendations_for_mission(db: Session, mission_id: uuid.UUID) -> list[Recommendation]:
+    """Ordered oldest-first. Mission.recommendation_id is NOT a reliable 'latest' pointer
+    once a mission has been revalidated after completion (M9) — it deliberately keeps
+    pointing at whatever was actually decided on. This is the real way to see everything."""
+    return (
+        db.query(Recommendation)
+        .filter(Recommendation.mission_id == mission_id)
+        .order_by(Recommendation.generated_at)
+        .all()
+    )
+
+
+def get_latest_recommendation_for_mission(db: Session, mission_id: uuid.UUID) -> Recommendation | None:
+    return (
+        db.query(Recommendation)
+        .filter(Recommendation.mission_id == mission_id)
+        .order_by(Recommendation.generated_at.desc())
+        .first()
+    )
+
+
+def get_evaluation(db: Session, mission_id: uuid.UUID, company_id: uuid.UUID) -> Recommendation:
+    mission = mission_service.get_mission(db, mission_id, company_id)
+    if mission.recommendation_id is None:
+        raise NotFoundError(f"Mission '{mission_id}' has no evaluation yet — run /evaluation/run first.")
+    recommendation = db.get(Recommendation, mission.recommendation_id)
+    return recommendation
+
+
+def get_compliance_matrix(db: Session, recommendation_id: uuid.UUID) -> list[ComplianceMatrix]:
+    return db.query(ComplianceMatrix).filter(ComplianceMatrix.recommendation_id == recommendation_id).all()
+
+
+def get_evaluation_bundle(db: Session, mission_id: uuid.UUID, company_id: uuid.UUID):
+    """
+    Everything an API response needs, assembled here rather than in the
+    router — thin routers, business logic inside services.
+
+    Returns (recommendation, compliance_rows, requirements_by_id).
+    """
+    from app.models import Requirement
+
+    recommendation = get_evaluation(db, mission_id, company_id)
+    compliance_rows = get_compliance_matrix(db, recommendation.id)
+    requirement_ids = [row.requirement_id for row in compliance_rows]
+    requirements = db.query(Requirement).filter(Requirement.id.in_(requirement_ids)).all()
+    requirements_by_id = {r.id: r for r in requirements}
+    return recommendation, compliance_rows, requirements_by_id
+
+
+def resolve_evidence_sources(
+    db: Session, compliance_rows: list[ComplianceMatrix]
+) -> dict[uuid.UUID, EvidenceSourceRead]:
+    """
+    Resolves each row's evidence_reference (a CapabilityMapping id) into the
+    actual company record and source document that grounds it — the
+    "Source Clause -> Company Document" half of the Decision Screen's
+    signature evidence trail (DESIGN_SYSTEM.md §10). This is a read-time
+    resolution only, nothing new is persisted.
+
+    Two-hop lookup: CapabilityMapping -> the one of five entity tables it
+    polymorphically points at -> that entity's source Document. Same shape
+    revalidation_service.py already uses for dependency traversal
+    (CapabilityMapping.capability_entity_type/capability_entity_id); this
+    just resolves to a display label instead of using it to find affected
+    missions.
+
+    Deliberately tolerant of a mapping whose cited entity no longer
+    resolves (e.g. removed) — skips it rather than raising, since a
+    resolution gap here must never break the evaluation response itself.
+    Returns keyed by CapabilityMapping.id (== ComplianceMatrix.evidence_reference).
+    """
+    mapping_ids = [row.evidence_reference for row in compliance_rows if row.evidence_reference is not None]
+    if not mapping_ids:
+        return {}
+
+    mappings = db.query(CapabilityMapping).filter(CapabilityMapping.id.in_(mapping_ids)).all()
+    if not mappings:
+        return {}
+
+    ids_by_type: dict[CapabilityEntityType, list[uuid.UUID]] = {}
+    for mapping in mappings:
+        ids_by_type.setdefault(mapping.capability_entity_type, []).append(mapping.capability_entity_id)
+
+    # (entity_type, entity_id) -> (label, source_document_id)
+    entities: dict[tuple[CapabilityEntityType, uuid.UUID], tuple[str, uuid.UUID | None]] = {}
+    for entity_type, entity_ids in ids_by_type.items():
+        model_cls, label_fn = _ENTITY_LABEL_RESOLVERS[entity_type]
+        for row in db.query(model_cls).filter(model_cls.id.in_(entity_ids)).all():
+            entities[(entity_type, row.id)] = (label_fn(row), row.source_document_id)
+
+    document_ids = {doc_id for _, doc_id in entities.values() if doc_id is not None}
+    document_names: dict[uuid.UUID, str] = {}
+    if document_ids:
+        for document in db.query(Document).filter(Document.id.in_(document_ids)).all():
+            document_names[document.id] = document.file_name
+
+    resolved: dict[uuid.UUID, EvidenceSourceRead] = {}
+    for mapping in mappings:
+        key = (mapping.capability_entity_type, mapping.capability_entity_id)
+        if key not in entities:
+            continue
+        label, source_document_id = entities[key]
+        resolved[mapping.id] = EvidenceSourceRead(
+            entity_type=mapping.capability_entity_type,
+            label=label,
+            source_document_id=source_document_id,
+            source_document_name=document_names.get(source_document_id) if source_document_id else None,
+        )
+    return resolved

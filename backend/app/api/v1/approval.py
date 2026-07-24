@@ -1,0 +1,91 @@
+"""
+Human Approval Layer API.
+
+POST /compliance/{id}/verify is a new endpoint (not in the frozen API
+doc — a genuine gap, same precedent as /auth/register and
+/missions/{id}/execute). POST /approval and GET /approval/{mission_id}
+match 06_API_Design.md directly.
+
+This router never calls tender_service or decision_service — it only
+governs the lifecycle of a recommendation that already exists.
+"""
+
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, require_approver
+from app.core.database import get_db
+from app.models import User
+from app.schemas.approval import (
+    ApprovalDecisionRequest,
+    ApprovalHistoryResponse,
+    DecisionEventRead,
+    VerifyComplianceRequest,
+)
+from app.schemas.decision import ComplianceMatrixEntryRead, RecommendationRead
+from app.schemas.mission import MissionRead
+from app.services import approval_service
+from app.services.exceptions import ConflictError, NotFoundError
+
+compliance_router = APIRouter(prefix="/compliance", tags=["approval"])
+approval_router = APIRouter(prefix="/approval", tags=["approval"])
+
+
+@compliance_router.post("/{compliance_id}/verify", response_model=ComplianceMatrixEntryRead)
+def verify_compliance_row(
+    compliance_id: uuid.UUID,
+    payload: VerifyComplianceRequest,
+    current_user: User = Depends(require_approver),
+    db: Session = Depends(get_db),
+) -> ComplianceMatrixEntryRead:
+    try:
+        row = approval_service.verify_compliance_row(
+            db, compliance_id, current_user.company_id, current_user.id,
+            payload.verification_status, payload.note,
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return ComplianceMatrixEntryRead.model_validate(row)
+
+
+@approval_router.post("", response_model=MissionRead)
+def record_decision(
+    payload: ApprovalDecisionRequest,
+    current_user: User = Depends(require_approver),
+    db: Session = Depends(get_db),
+) -> MissionRead:
+    try:
+        mission = approval_service.record_decision(
+            db, payload.mission_id, current_user.company_id, current_user.id,
+            payload.decision, payload.reason,
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return MissionRead.model_validate(mission)
+
+
+@approval_router.get("/{mission_id}", response_model=ApprovalHistoryResponse)
+def get_approval_history(
+    mission_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ApprovalHistoryResponse:
+    try:
+        mission, recommendation, compliance_rows, decision_events = approval_service.get_approval_history(
+            db, mission_id, current_user.company_id
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    return ApprovalHistoryResponse(
+        mission=MissionRead.model_validate(mission),
+        recommendation=RecommendationRead.model_validate(recommendation),
+        compliance_matrix=[ComplianceMatrixEntryRead.model_validate(r) for r in compliance_rows],
+        decision_events=[DecisionEventRead.model_validate(e) for e in decision_events],
+    )

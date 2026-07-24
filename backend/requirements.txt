@@ -1,0 +1,25 @@
+# BidOps AI — dependencies, added incrementally as each milestone needed them.
+# Grouped roughly by the milestone that introduced them (see 99_DECISIONS_LOG.md
+# for the reasoning behind each library choice).
+
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic-settings==2.5.2
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+alembic==1.13.3
+bcrypt==4.2.0
+PyJWT==2.9.0
+email-validator==2.2.0
+python-multipart==0.0.12
+pypdf==5.0.1
+pdf2image==1.17.0
+pytesseract==0.3.13
+python-docx==1.1.2
+openai==1.109.1
+google-genai==2.12.1
+
+# Testing (M11.5) — committed offline verification harness for the LLM
+# provider layer (see tests/agents/test_llm_client.py).
+pytest==8.3.4
+pytest-asyncio==0.25.2

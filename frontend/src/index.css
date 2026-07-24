@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Design tokens -- sourced from docs/DESIGN_SYSTEM.md v1.0 (frozen).
+
+  Palette principle (§4/§6 of the Design System): ONE accent color, used
+  sparingly, chosen because it reinforces BidOps's personality (evidence,
+  trust, precision, calm), not because a competitor avoids it. Deep blue
+  is the primary/interactive color; a single muted teal is the only other
+  hue in the system, reserved for evidence/traceability emphasis (the
+  "View evidence" / source-clause trail on the Decision Screen). No
+  purple, no violet, no second competing accent -- this replaces the
+  earlier indigo/violet palette, which predates the frozen Design System.
+
+  Semantic status colors (success/warning/danger/info) are a separate
+  system serving compliance-status meaning, not brand decoration, and are
+  kept close to conventional traffic-light hues so they stay legible.
+
+  Two palettes (light/dark), toggled via a `.dark` class on <html>.
+*/
+
+:root {
+  --background: 220 20% 98%;
+  --foreground: 224 24% 12%;
+  --surface: 0 0% 100%;
+  --surface-hover: 220 20% 96.5%;
+  --border: 220 14% 90%;
+  --input: 220 14% 88%;
+  --ring: 217 60% 42%;
+
+  --muted: 216 24% 93%;
+  --muted-foreground: 215 16% 42%; /* slate */
+
+  --primary: 217 60% 38%; /* deep blue */
+  --primary-hover: 217 64% 30%;
+  --primary-foreground: 0 0% 100%;
+
+  --brand-accent: 174 55% 28%; /* single accent: muted teal, evidence/traceability emphasis only */
+
+  --accent: 222 24% 12%;
+  --accent-foreground: 0 0% 100%;
+
+  --success: 142 71% 45%; /* #22C55E */
+  --success-foreground: 0 0% 100%;
+  --success-soft: 142 55% 94%;
+
+  --warning: 38 92% 50%; /* #F59E0B */
+  --warning-foreground: 0 0% 100%;
+  --warning-soft: 38 92% 93%;
+
+  --danger: 0 84% 60%; /* #EF4444 */
+  --danger-foreground: 0 0% 100%;
+  --danger-soft: 0 80% 95%;
+
+  --info: 217 70% 50%;
+  --info-soft: 217 70% 95%;
+
+  /* Brand surface -- deliberately identical in both palettes below. This
+     is the "always on-brand" color for hero/marketing surfaces (Login
+     split panel) that should never flip with light/dark mode. Previously
+     these surfaces used --accent (which DOES flip) with hardcoded white
+     text on top, so dark mode broke contrast. */
+  --brand: 221 42% 13%; /* deep navy-slate, same hue family as --primary */
+  --brand-foreground: 0 0% 100%;
+
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: 224 28% 7%;
+  --foreground: 220 20% 94%;
+  --surface: 224 24% 10%;
+  --surface-hover: 224 22% 13%;
+  --border: 222 18% 18%;
+  --input: 222 18% 20%;
+  --ring: 217 65% 62%;
+
+  --muted: 222 18% 14%;
+  --muted-foreground: 220 12% 65%;
+
+  --primary: 217 65% 58%;
+  --primary-hover: 217 65% 66%;
+  --primary-foreground: 224 28% 9%;
+
+  --brand-accent: 174 45% 48%;
+
+  --accent: 220 20% 94%;
+  --accent-foreground: 224 28% 10%;
+
+  --success: 142 60% 50%;
+  --success-foreground: 224 28% 7%;
+  --success-soft: 142 40% 14%;
+
+  --warning: 38 92% 58%;
+  --warning-foreground: 224 28% 7%;
+  --warning-soft: 38 60% 14%;
+
+  --danger: 0 84% 68%;
+  --danger-foreground: 224 28% 7%;
+  --danger-soft: 0 50% 15%;
+
+  --info: 217 80% 65%;
+  --info-soft: 217 40% 15%;
+
+  --brand: 221 42% 13%;
+  --brand-foreground: 0 0% 100%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* DESIGN_SYSTEM.md v1.0 §5: page-level headings use the display serif,
+   everything else (labels, body, tables, UI chrome) stays on Inter. */
+h1 {
+  @apply font-display font-medium;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background-color: hsl(var(--primary) / 0.2);
+}
+
+/* thin, unobtrusive scrollbars -- default OS scrollbars break the polish */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Decorative dot-grid used behind the Login brand panel -- subtle texture,
+   not a glow/blur effect, kept deliberately flat per the "no glassmorphism,
+   no neon" brief. */
+.bg-dot-grid {
+  background-image: radial-gradient(hsl(var(--brand-foreground) / 0.12) 1px, transparent 1px);
+  background-size: 22px 22px;
+}

@@ -1,0 +1,65 @@
+"""Tender, Requirement, CapabilityMapping — 05_Database_Design.md."""
+
+import uuid
+from datetime import date
+
+from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base
+from app.models.enums import CapabilityEntityType, MatchStatus, RequirementType
+from app.models.mixins import UUIDPrimaryKeyMixin
+
+
+class Tender(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "tenders"
+
+    mission_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False
+    )
+    tender_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    organization: Mapped[str | None] = mapped_column(String, nullable=True)
+    closing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    uploaded_document: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id"), nullable=True
+    )
+    processing_status: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class Requirement(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "requirements"
+
+    tender_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenders.id"), nullable=False
+    )
+    requirement_type: Mapped[RequirementType] = mapped_column(
+        Enum(RequirementType, name="requirement_type"), nullable=False
+    )
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    mandatory: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Numeric(5, 4), nullable=True)
+
+
+class CapabilityMapping(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "capability_mappings"
+
+    requirement_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("requirements.id"), nullable=False
+    )
+
+    # Polymorphic reference to one of the five capability entity tables —
+    # see the structural-gap note given before this step. Integrity across
+    # the referenced table is enforced at the application layer, since a
+    # single DB foreign key can't target one of five different tables.
+    capability_entity_type: Mapped[CapabilityEntityType] = mapped_column(
+        Enum(CapabilityEntityType, name="capability_entity_type"), nullable=False
+    )
+    capability_entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+
+    match_status: Mapped[MatchStatus] = mapped_column(
+        Enum(MatchStatus, name="match_status"), nullable=False
+    )
+    evidence: Mapped[str | None] = mapped_column(String, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Numeric(5, 4), nullable=True)

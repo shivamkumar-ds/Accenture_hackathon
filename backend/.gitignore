@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+*.egg-info/
+storage/
+
+# Never commit ad-hoc credential/test files at repo root -- a hardcoded
+# real API key was found in test_gemini.py during the Vertex AI migration
+# audit (removed; key should be rotated in Google AI Studio regardless).
+login.txt
+/test_*.py
