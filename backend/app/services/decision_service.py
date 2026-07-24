@@ -12,12 +12,14 @@ then Mission is updated last to point at the finished Recommendation
 and Snapshot.
 """
 
+import asyncio
 import logging
 import uuid
 
 from sqlalchemy.orm import Session
 
 from app.agents import decision_engine
+from app.core.config import get_settings
 from app.models import (
     CapabilityMapping,
     CapabilitySnapshot,
@@ -42,6 +44,8 @@ from app.schemas.capability import (
 from app.schemas.decision import EvidenceSourceRead
 from app.services import capability_service, mission_service
 from app.services.exceptions import ExtractionError, NotFoundError
+
+settings = get_settings()
 
 # entity_type -> (ORM model, display-label function). Same polymorphic shape
 # revalidation_service.py already relies on (CapabilityMapping.capability_entity_type
@@ -111,31 +115,58 @@ async def run_evaluation(
 
     all_entities = capability_service.list_capabilities(db, company_id)
 
-    results = []
     entity_confidences: list[float] = []
     document_ids_cited: set[uuid.UUID] = set()
 
-    try:
-        for requirement in requirements:
-            if requirement.requirement_type in decision_engine.PROCEDURAL_CATEGORIES:
-                candidates = []
-            else:
-                domains = decision_engine.CATEGORY_DOMAINS[requirement.requirement_type]
-                candidates = [
-                    (entity_type, entity) for entity_type, entity in all_entities if entity_type in domains
-                ]
-            result = await decision_engine.match_requirement(requirement, candidates)
-            results.append(result)
+    # RC-2 remediation (finding H-3): per-requirement LLM matching used to
+    # run fully sequentially -- one `await` per requirement, one at a time.
+    # For a realistic 30-50 requirement tender that's 30-150+ seconds of
+    # pure sequential LLM latency inside one synchronous request. This
+    # parallelizes the independent matches with a bounded semaphore
+    # (settings.decision_engine_max_concurrency, default 5) rather than
+    # unlimited concurrency, so a large tender can't hammer the LLM
+    # provider with dozens of simultaneous requests at once.
+    #
+    # Candidates are computed up front, outside the coroutine, so every
+    # concurrent task only ever reads `all_entities` (never mutates it) --
+    # no shared-state race between tasks. `asyncio.gather()` preserves the
+    # order of its input list in its output list regardless of completion
+    # order, so `results` ends up in the exact same requirement order the
+    # old sequential loop produced -- ordering is preserved by construction,
+    # not by extra bookkeeping. Error handling is unchanged in effect: by
+    # default `gather()` (no `return_exceptions=True`) re-raises the first
+    # exception encountered, exactly matching the old loop's "one failure
+    # fails the whole evaluation" behavior, still caught by the same
+    # try/except below and converted to the same ExtractionError.
+    semaphore = asyncio.Semaphore(settings.decision_engine_max_concurrency)
 
-            if result.matched_entity_id is not None:
-                matched_entity = next(e for t, e in candidates if e.id == result.matched_entity_id)
-                if matched_entity.confidence_score is not None:
-                    entity_confidences.append(float(matched_entity.confidence_score))
-                if matched_entity.source_document_id is not None:
-                    document_ids_cited.add(matched_entity.source_document_id)
+    async def _match_one(requirement):
+        if requirement.requirement_type in decision_engine.PROCEDURAL_CATEGORIES:
+            candidates = []
+        else:
+            domains = decision_engine.CATEGORY_DOMAINS[requirement.requirement_type]
+            candidates = [
+                (entity_type, entity) for entity_type, entity in all_entities if entity_type in domains
+            ]
+        async with semaphore:
+            result = await decision_engine.match_requirement(requirement, candidates)
+        return result, candidates
+
+    try:
+        matched = await asyncio.gather(*(_match_one(requirement) for requirement in requirements))
     except Exception as exc:
         logger.exception("Evaluation run failed: mission_id=%s", mission_id)
         raise ExtractionError(f"Decision evaluation failed for mission '{mission_id}': {exc}") from exc
+
+    results = []
+    for result, candidates in matched:
+        results.append(result)
+        if result.matched_entity_id is not None:
+            matched_entity = next(e for t, e in candidates if e.id == result.matched_entity_id)
+            if matched_entity.confidence_score is not None:
+                entity_confidences.append(float(matched_entity.confidence_score))
+            if matched_entity.source_document_id is not None:
+                document_ids_cited.add(matched_entity.source_document_id)
 
     document_confidences = _document_confidences(db, document_ids_cited)
 
