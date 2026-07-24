@@ -58,13 +58,16 @@ export default function Dashboard() {
     const missionList = await listMissions();
     setMissions(missionList);
 
-    // Aggregate real numbers across every completed mission, not just the
-    // latest one -- these stand in for the reference's summary-style
-    // figures without needing a real ML model or a market-wide dataset we
-    // don't have.
-    const completed = missionList.filter((m) => m.status === "completed" && m.recommendation_id);
+    // A mission is "reportable"/evaluated as soon as the Decision Engine has
+    // produced a recommendation_id -- same definition Reports.tsx uses.
+    // Mission status itself normally sits at "awaiting_approval" at that
+    // point (there's no in-app approve/complete action yet), so gating this
+    // on status === "completed" was undercounting every evaluation that had
+    // a real, ready report -- that was the Evaluations/Reports stat cards
+    // showing 0 with a report already available.
+    const reportable = missionList.filter((m) => m.recommendation_id);
     const results = await Promise.all(
-      completed.map(async (m) => ({ mission: m, evaluation: await getEvaluation(m.id) }))
+      reportable.map(async (m) => ({ mission: m, evaluation: await getEvaluation(m.id) }))
     );
     results.sort((a, b) => (b.mission.completed_at ?? "").localeCompare(a.mission.completed_at ?? ""));
     setEvaluations(results);

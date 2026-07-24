@@ -68,21 +68,21 @@ export function StatCard({
   linkLabel?: string;
 }) {
   return (
-    <Card className="p-5 transition-shadow hover:shadow-elevated flex flex-col">
-      <div className="flex items-start justify-between">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+    <Card className="p-4 transition-shadow hover:shadow-elevated flex flex-col">
+      <div className="flex items-center gap-2.5 mb-2.5">
         {icon && (
           <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", statToneClasses[tone])}>
             {icon}
           </div>
         )}
+        <p className="text-xs font-medium text-muted-foreground truncate">{label}</p>
       </div>
-      <p className="text-3xl font-semibold tracking-tight mt-3 tabular-nums">{value}</p>
-      {trend && <p className="text-xs text-muted-foreground mt-1">{trend}</p>}
+      <p className="text-2xl font-bold tracking-tight tabular-nums">{value}</p>
+      {trend && <p className="text-xs text-muted-foreground mt-0.5">{trend}</p>}
       {linkTo && (
         <Link
           to={linkTo}
-          className="text-xs font-medium text-primary hover:underline mt-3 inline-flex items-center gap-1 pt-2 border-t border-border"
+          className="text-xs font-medium text-primary hover:underline mt-2.5 inline-flex items-center gap-1 pt-2 border-t border-border"
         >
           {linkLabel ?? "View all"} <span aria-hidden="true">→</span>
         </Link>
