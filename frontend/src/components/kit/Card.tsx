@@ -68,25 +68,25 @@ export function StatCard({
   linkLabel?: string;
 }) {
   return (
-    <Card className="p-4 transition-shadow hover:shadow-elevated flex flex-col">
-      <p className="text-xs font-medium text-muted-foreground leading-tight mb-2.5">{label}</p>
-      <div className="flex items-center gap-3">
-        {icon && (
-          <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", statToneClasses[tone])}>
-            {icon}
-          </div>
-        )}
-        <p className="text-2xl font-bold tracking-tight tabular-nums">{value}</p>
-      </div>
-      {trend && <p className="text-xs text-muted-foreground mt-2">{trend}</p>}
-      {linkTo && (
-        <Link
-          to={linkTo}
-          className="text-xs font-medium text-primary hover:underline mt-2.5 inline-flex items-center gap-1"
-        >
-          {linkLabel ?? "View all"} <span aria-hidden="true">→</span>
-        </Link>
+    <Card className="p-4 transition-shadow hover:shadow-elevated flex gap-3">
+      {icon && (
+        <div className={cn("w-11 h-11 rounded-lg flex items-center justify-center shrink-0", statToneClasses[tone])}>
+          {icon}
+        </div>
       )}
+      <div className="min-w-0 flex-1 flex flex-col">
+        <p className="text-xs font-medium text-muted-foreground leading-tight">{label}</p>
+        <p className="text-2xl font-bold tracking-tight tabular-nums mt-1">{value}</p>
+        {trend && <p className="text-xs text-muted-foreground mt-1.5">{trend}</p>}
+        {linkTo && (
+          <Link
+            to={linkTo}
+            className="text-xs font-medium text-primary hover:underline mt-2 inline-flex items-center gap-1"
+          >
+            {linkLabel ?? "View all"} <span aria-hidden="true">→</span>
+          </Link>
+        )}
+      </div>
     </Card>
   );
 }
