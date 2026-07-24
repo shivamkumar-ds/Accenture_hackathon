@@ -8,7 +8,18 @@
 
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    // aria-hidden: decorative when paired with the "BidOps AI" wordmark
+    // (Logo, below) that already conveys the same information as text --
+    // RC-1 audit finding C1. Where LogoMark is ever used alone with no
+    // adjacent text, a caller should add its own aria-label instead.
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
       <rect width="32" height="32" rx="8" className="fill-primary" />
       <path
         d="M11 7h6.5a4 4 0 0 1 2.2 7.35A4.5 4.5 0 0 1 17.5 23H11V7Zm3 3v4.5h3a2.25 2.25 0 0 0 0-4.5h-3Zm0 7.5V20h3.5a2.25 2.25 0 0 0 0-4.5H14Z"

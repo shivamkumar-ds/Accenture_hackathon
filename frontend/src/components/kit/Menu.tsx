@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../../lib/cn";
 
-export function Menu({ trigger, children, align = "right" }: { trigger: ReactNode; children: ReactNode; align?: "left" | "right" }) {
+export function Menu({
+  trigger,
+  children,
+  align = "right",
+  label,
+}: {
+  trigger: ReactNode;
+  children: ReactNode;
+  align?: "left" | "right";
+  /** Accessible name for the trigger button — e.g. "Account menu". RC-1 audit finding C1: this
+      dropdown had no accessible name or expanded-state signal for screen reader users. */
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -16,7 +28,14 @@ export function Menu({ trigger, children, align = "right" }: { trigger: ReactNod
 
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label={label}
+      >
         {trigger}
       </button>
       {open && (

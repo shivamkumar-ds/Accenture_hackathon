@@ -60,6 +60,7 @@ export default function Layout() {
           The content column below gets `lg:ml-60` to reserve the space a
           fixed element doesn't occupy in normal flow. */}
       <aside
+        aria-label="Sidebar"
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 lg:w-60 border-r border-border bg-surface flex flex-col shrink-0 transition-transform duration-200 ease-out",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
@@ -76,7 +77,7 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav aria-label="Main navigation" className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -132,9 +133,13 @@ export default function Layout() {
             <div className="hidden md:block h-8 w-px bg-border" />
 
             <Menu
+              label={`Account menu for ${user?.name ?? "current user"}`}
               trigger={
                 <span className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                  <div
+                    aria-hidden="true"
+                    className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0"
+                  >
                     {user?.name?.[0]?.toUpperCase() ?? "?"}
                   </div>
                   <span className="hidden lg:block text-left leading-tight">
@@ -162,7 +167,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 min-w-0">
+        <main aria-label={currentLabel} className="flex-1 min-w-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
             <Outlet />
           </div>
