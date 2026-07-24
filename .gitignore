@@ -29,6 +29,9 @@ coverage/
 .coverage
 htmlcov/
 
+# TypeScript incremental build cache — regenerated automatically, pure noise in diffs
+*.tsbuildinfo
+
 # Editors
 .vscode/
 .idea/
