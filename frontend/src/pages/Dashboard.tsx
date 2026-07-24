@@ -1,69 +1,89 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { getEvaluation, listMissions } from "../api/endpoints";
+import { Link, useNavigate } from "react-router-dom";
+import { executeMission, getCapabilityGraph, getEvaluation, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
-import type { EvaluationResponse, MissionRead, MissionStatus } from "../api/types";
+import type { CapabilityGraphResponse, EvaluationResponse, MissionRead, MissionStatus } from "../api/types";
 import {
   Badge,
   Card,
   CardBody,
   CardHeader,
-  CREDITS_TOTAL,
-  CREDITS_USED,
+  EmptyState,
+  Menu,
+  MenuItem,
+  SkeletonList,
+  SkeletonStatRow,
   StatCard,
-  StatusDonut,
   useGreeting,
 } from "../components/kit";
-import { recommendationLabel } from "../lib/recommendationLabels";
-import { SkeletonList, SkeletonStatRow } from "../components/kit";
-import { EmptyState } from "../components/kit";
 import {
   AlertTriangle,
   ArrowRight,
+  Bell,
   CheckCircle2,
-  FileStack,
+  FileBarChart2,
+  FileSearch,
+  FileUp,
   Layers,
+  Loader2,
+  MoreVertical,
   Radar,
   Sparkles,
   Target,
-  TrendingUp,
-  Zap,
 } from "lucide-react";
 
-const PIPELINE_STAGES: { key: MissionStatus; label: string; tone: string }[] = [
-  { key: "created", label: "Uploaded", tone: "bg-muted-foreground/40" },
-  { key: "running", label: "Processing", tone: "bg-info" },
-  { key: "awaiting_approval", label: "Awaiting Approval", tone: "bg-warning" },
-  { key: "completed", label: "Completed", tone: "bg-success" },
-  { key: "archived", label: "Archived", tone: "bg-muted-foreground/20" },
+// Real MissionStatus values, relabeled for the "Evaluation Status" column --
+// Badge already maps these to consistent tones/icons app-wide.
+const EVAL_STATUS_LABEL: Record<MissionStatus, string> = {
+  created: "Queued",
+  running: "Analysis Running",
+  awaiting_approval: "Awaiting Approval",
+  completed: "Completed",
+  archived: "Archived",
+};
+
+// Explains the real product flow -- no invented steps, matches how the app
+// actually works end to end.
+const onboardingSteps = [
+  { icon: FileUp, title: "Upload Tender", description: "Upload tender documents in PDF format.", to: "/tenders/new" },
+  { icon: Sparkles, title: "AI Analysis", description: "Our AI engine extracts requirements & eligibility criteria.", to: "/tenders/new" },
+  { icon: Layers, title: "Capability Match", description: "Matches requirements against your organizational capabilities.", to: "/capabilities" },
+  { icon: Target, title: "Get Recommendation", description: "Receive a GO / NO-GO recommendation with a full report.", to: "/reports" },
 ];
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const { notify } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const greeting = useGreeting(user?.name);
   const [missions, setMissions] = useState<MissionRead[]>([]);
   const [evaluations, setEvaluations] = useState<{ mission: MissionRead; evaluation: EvaluationResponse }[]>([]);
+  const [capabilities, setCapabilities] = useState<CapabilityGraphResponse | null>(null);
+  const [runningId, setRunningId] = useState<string | null>(null);
+
+  const loadMissions = async () => {
+    const missionList = await listMissions();
+    setMissions(missionList);
+
+    // Aggregate real numbers across every completed mission, not just the
+    // latest one -- these stand in for the reference's summary-style
+    // figures without needing a real ML model or a market-wide dataset we
+    // don't have.
+    const completed = missionList.filter((m) => m.status === "completed" && m.recommendation_id);
+    const results = await Promise.all(
+      completed.map(async (m) => ({ mission: m, evaluation: await getEvaluation(m.id) }))
+    );
+    results.sort((a, b) => (b.mission.completed_at ?? "").localeCompare(a.mission.completed_at ?? ""));
+    setEvaluations(results);
+  };
 
   useEffect(() => {
     (async () => {
       try {
-        const missionList = await listMissions();
-        setMissions(missionList);
-
-        // Aggregate real numbers across every completed mission, not just
-        // the latest one -- these stand in for the reference's "Win
-        // Probability"-style figures without needing a real ML model or a
-        // market-wide dataset we don't have (see chat history).
-        const completed = missionList.filter((m) => m.status === "completed" && m.recommendation_id);
-        const results = await Promise.all(
-          completed.map(async (m) => ({ mission: m, evaluation: await getEvaluation(m.id) }))
-        );
-        results.sort((a, b) => (b.mission.completed_at ?? "").localeCompare(a.mission.completed_at ?? ""));
-        setEvaluations(results);
+        await Promise.all([loadMissions(), getCapabilityGraph().then(setCapabilities)]);
       } catch (err) {
         notify("error", extractErrorMessage(err));
       } finally {
@@ -72,28 +92,6 @@ export default function Dashboard() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const activeMissions = useMemo(
-    () => missions.filter((m) => m.status === "running" || m.status === "created" || m.status === "awaiting_approval"),
-    [missions]
-  );
-
-  const latest = evaluations[0] ?? null;
-
-  const goCount = useMemo(
-    () => evaluations.filter((e) => e.evaluation.recommendation.recommendation_type === "go").length,
-    [evaluations]
-  );
-
-  const successRate = evaluations.length
-    ? Math.round(
-        (evaluations.filter((e) =>
-          ["go", "conditional_go"].includes(e.evaluation.recommendation.recommendation_type)
-        ).length /
-          evaluations.length) *
-          100
-      )
-    : null;
 
   const criticalGaps = useMemo(
     () =>
@@ -104,71 +102,17 @@ export default function Dashboard() {
     [evaluations]
   );
 
-  // Real compliance-status breakdown aggregated across every evaluated
-  // mission's compliance_matrix -- same data the reference's "Requirement
-  // Compliance" donut implied, just computed from what we actually have
-  // instead of a static mock number.
-  const complianceSegments = useMemo(() => {
-    const counts = { met: 0, conditional: 0, review_required: 0, not_met: 0 };
-    evaluations.forEach((e) => {
-      e.evaluation.compliance_matrix.forEach((c) => {
-        counts[c.status] = (counts[c.status] ?? 0) + 1;
-      });
-    });
-    return [
-      { key: "met", label: "Met", count: counts.met },
-      { key: "conditional", label: "Conditional", count: counts.conditional },
-      { key: "review_required", label: "Review Required", count: counts.review_required },
-      { key: "not_met", label: "Not Met", count: counts.not_met },
-    ];
-  }, [evaluations]);
-  const complianceTotal = complianceSegments.reduce((s, c) => s + c.count, 0);
-  const complianceAvgPct = complianceTotal ? Math.round((complianceSegments[0].count / complianceTotal) * 100) : null;
-
-  // Real, derived insight -- the most frequently recurring unresolved
-  // requirement description across every evaluated mission. Not a
-  // fabricated "AI recommendation," just an honest frequency count over
-  // data we already fetched.
-  const topInsight = useMemo(() => {
-    const counts = new Map<string, number>();
-    evaluations.forEach((e) => {
-      e.evaluation.gap_analysis
-        .filter((g) => g.status !== "met" && g.description)
-        .forEach((g) => counts.set(g.description!, (counts.get(g.description!) ?? 0) + 1));
-    });
-    const entries = Array.from(counts.entries());
-    if (entries.length === 0) return null;
-    const [description, count] = entries.reduce((max, entry) => (entry[1] > max[1] ? entry : max));
-    return { description, count };
-  }, [evaluations]);
-
-  const continueTarget = activeMissions[0] ?? null;
-
   // DESIGN_SYSTEM.md v1.0 §9: the dashboard should answer "what needs my
   // attention today," not "look how many tenders exist." These are the two
   // situations that genuinely require a human decision right now -- a
-  // mission waiting on approval, or a mandatory requirement that isn't
-  // met -- built entirely from data already fetched above, not a new
-  // endpoint or a fabricated "priority score."
+  // mission waiting on approval, or a mandatory requirement that isn't met.
   const attentionItems = useMemo(() => {
-    const items: {
-      id: string;
-      label: string;
-      detail: string;
-      to: string;
-      tone: "warning" | "danger";
-    }[] = [];
+    const items: { id: string; label: string; detail: string; to: string; tone: "warning" | "danger" }[] = [];
 
     missions
       .filter((m) => m.status === "awaiting_approval")
       .forEach((m) =>
-        items.push({
-          id: `approval-${m.id}`,
-          label: m.mission_type,
-          detail: "Awaiting your approval",
-          to: `/missions/${m.id}`,
-          tone: "warning",
-        })
+        items.push({ id: `approval-${m.id}`, label: m.mission_type, detail: "Awaiting your approval", to: `/missions/${m.id}`, tone: "warning" })
       );
 
     evaluations.forEach(({ mission, evaluation }) => {
@@ -187,48 +131,97 @@ export default function Dashboard() {
     return items.slice(0, 5);
   }, [missions, evaluations]);
 
-  const pipelineCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    PIPELINE_STAGES.forEach((s) => (counts[s.key] = 0));
-    missions.forEach((m) => (counts[m.status] = (counts[m.status] ?? 0) + 1));
-    return counts;
-  }, [missions]);
-  const pipelineTotal = missions.length || 1;
+  const runningMission = missions.find((m) => m.status === "running") ?? null;
 
-  const recentEvaluations = evaluations.slice(0, 5);
+  // "Recent Activity" -- merged from real timestamped events we already
+  // have (mission uploaded, mission completed, capability record added).
+  // No fabricated activity log or notification feed.
+  const recentActivity = useMemo(() => {
+    type Item = { id: string; icon: typeof FileUp; label: string; detail: string; at: string };
+    const items: Item[] = [];
+
+    missions.forEach((m) => {
+      items.push({ id: `up-${m.id}`, icon: FileUp, label: "Tender uploaded", detail: m.mission_type, at: m.created_at });
+      if (m.completed_at) {
+        items.push({ id: `done-${m.id}`, icon: CheckCircle2, label: "Evaluation completed", detail: m.mission_type, at: m.completed_at });
+      }
+    });
+
+    if (capabilities) {
+      type AnyCapabilityEntry =
+        | CapabilityGraphResponse["certifications"][number]
+        | CapabilityGraphResponse["employees"][number]
+        | CapabilityGraphResponse["projects"][number]
+        | CapabilityGraphResponse["equipment"][number]
+        | CapabilityGraphResponse["financial_records"][number];
+      const named = (c: AnyCapabilityEntry) =>
+        ("certification_name" in c && c.certification_name) ||
+        ("name" in c && c.name) ||
+        ("equipment_name" in c && c.equipment_name) ||
+        "Company record";
+      const allEntries: AnyCapabilityEntry[] = [
+        ...capabilities.certifications,
+        ...capabilities.employees,
+        ...capabilities.projects,
+        ...capabilities.equipment,
+        ...capabilities.financial_records,
+      ];
+      allEntries.forEach((c) =>
+        items.push({ id: `cap-${c.id}`, icon: Layers, label: "Capability added", detail: named(c), at: c.created_at })
+      );
+    }
+
+    return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6);
+  }, [missions, capabilities]);
+
+  const recentMissions = missions.slice(0, 6);
+
+  const handleRunFullAnalysis = async (missionId: string) => {
+    setRunningId(missionId);
+    try {
+      await executeMission(missionId);
+      notify("success", "Full analysis complete — recommendation generated.");
+      await loadMissions();
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setRunningId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">From Documents to Decisions.</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{greeting} 👋</h1>
-        <p className="text-sm text-muted-foreground mt-1">Here's what needs your attention today.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{greeting} 👋</h1>
+          <p className="text-sm text-muted-foreground mt-1">Here's what's happening with your tenders today.</p>
+        </div>
+        {!loading && (
+          <a href="#attention" className="relative shrink-0">
+            <div className="w-9 h-9 rounded-lg border border-border bg-surface flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors">
+              <Bell size={16} />
+            </div>
+            {attentionItems.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-danger-foreground text-[10px] font-bold flex items-center justify-center">
+                {attentionItems.length}
+              </span>
+            )}
+          </a>
+        )}
       </div>
 
-      {/* Decision-first, not inventory-first (DESIGN_SYSTEM.md §9): this is
-          the first substantive content on the page, ahead of the stat
-          grid, because "what needs a decision from me" matters more than
-          "how many things exist." A calm all-clear state is itself a
-          meaningful, reassuring answer -- not an empty placeholder. */}
       {!loading && (
-        <Card className={attentionItems.length > 0 ? "border-warning/30" : undefined}>
+        <Card id="attention" className={attentionItems.length > 0 ? "border-warning/30 scroll-mt-6" : "scroll-mt-6"}>
           <CardHeader
             title="Needs Your Attention"
-            description={
-              attentionItems.length > 0
-                ? `${attentionItems.length} item(s) waiting on a decision`
-                : "Nothing requires a decision right now"
-            }
+            description={attentionItems.length > 0 ? `${attentionItems.length} item(s) waiting on a decision` : "Nothing requires a decision right now"}
           />
           <CardBody className={attentionItems.length > 0 ? "!py-2" : undefined}>
             {attentionItems.length > 0 ? (
               <ul className="divide-y divide-border -mx-6">
                 {attentionItems.map((item) => (
                   <li key={item.id}>
-                    <Link
-                      to={item.to}
-                      className="flex items-center justify-between gap-3 px-6 py-3 hover:bg-surface-hover transition-colors"
-                    >
+                    <Link to={item.to} className="flex items-center justify-between gap-3 px-6 py-3 hover:bg-surface-hover transition-colors">
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{item.label}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>
@@ -243,9 +236,7 @@ export default function Dashboard() {
                 <div className="w-8 h-8 rounded-lg bg-success/10 text-success flex items-center justify-center shrink-0">
                   <CheckCircle2 size={15} />
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  No missions are awaiting approval and no mandatory requirements are unresolved.
-                </p>
+                <p className="text-sm text-muted-foreground">No missions are awaiting approval and no mandatory requirements are unresolved.</p>
               </div>
             )}
           </CardBody>
@@ -256,210 +247,245 @@ export default function Dashboard() {
         <SkeletonStatRow />
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard label="Active Evaluations" value={activeMissions.length} icon={<Radar size={16} />} tone="info" />
           <StatCard
-            label="GO Recommendations"
-            value={goCount}
-            icon={<Target size={16} />}
-            tone="success"
-            trend={evaluations.length ? `of ${evaluations.length} evaluated` : undefined}
+            label="Tenders"
+            value={missions.length}
+            icon={<FileUp size={16} />}
+            tone="info"
+            trend="Total Uploaded"
+            linkTo="/missions"
+            linkLabel="View all tenders"
           />
-          <StatCard label="Success Rate" value={successRate != null ? `${successRate}%` : "—"} icon={<TrendingUp size={16} />} tone="primary" />
+          <StatCard
+            label="Evaluations"
+            value={evaluations.length}
+            icon={<CheckCircle2 size={16} />}
+            tone="success"
+            trend="Completed"
+            linkTo="/reports"
+            linkLabel="View all evaluations"
+          />
+          <StatCard
+            label="Capability Library"
+            value={capabilities?.summary.total_entities ?? 0}
+            icon={<Layers size={16} />}
+            tone="primary"
+            trend="Capabilities Extracted"
+            linkTo="/capabilities"
+            linkLabel="View library"
+          />
+          <StatCard
+            label="Reports"
+            value={evaluations.length}
+            icon={<FileBarChart2 size={16} />}
+            tone="warning"
+            trend="Reports Available"
+            linkTo="/reports"
+            linkLabel="View all reports"
+          />
           <StatCard
             label="Critical Gaps"
             value={criticalGaps}
             icon={<AlertTriangle size={16} />}
-            tone={criticalGaps > 0 ? "warning" : "success"}
-          />
-          <StatCard
-            label="AI Credits"
-            value={`${Math.round(((CREDITS_TOTAL - CREDITS_USED) / CREDITS_TOTAL) * 100)}%`}
-            icon={<Zap size={16} />}
-            tone="neutral"
-            trend="remaining"
+            tone={criticalGaps > 0 ? "danger" : "success"}
+            trend={criticalGaps > 0 ? "Mandatory gaps unresolved" : "None outstanding"}
+            linkTo="/missions"
+            linkLabel="Review gaps"
           />
         </div>
       )}
 
-      {!loading && continueTarget && (
-        <Card className="border-primary/30 bg-primary/[0.03]">
-          <CardBody>
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Continue where you left off</p>
-                <p className="font-medium truncate">{continueTarget.mission_type}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Status: <Badge value={continueTarget.status} />
-                </p>
-              </div>
-              <Link
-                to={`/missions/${continueTarget.id}`}
-                className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors shrink-0"
-              >
-                Continue <ArrowRight size={14} />
-              </Link>
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Two even rows instead of three independent-height columns -- every
-          card in a row now matches height (`items-stretch` + `h-full` +
-          `flex-1` on the body), so the grid reads as a deliberate layout
-          rather than a jagged masonry of whatever each card's content
-          happened to need. */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        <Card className="h-full flex flex-col">
-          <CardHeader title="Mission Pipeline" description={`${missions.length} total mission(s)`} />
-          <CardBody className="flex-1">
-            {loading ? (
-              <SkeletonList rows={1} />
-            ) : missions.length === 0 ? (
-              <EmptyState compact icon={Radar} title="No missions yet" description="Upload a tender to start your first mission." />
-            ) : (
-              <div className="space-y-3">
-                <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-muted">
-                  {PIPELINE_STAGES.map((s) => {
-                    const pct = (pipelineCounts[s.key] / pipelineTotal) * 100;
-                    return pct > 0 ? <div key={s.key} className={s.tone} style={{ width: `${pct}%` }} /> : null;
-                  })}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader
+              title="Recent Tenders"
+              action={
+                <Link
+                  to="/tenders/new"
+                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors shrink-0"
+                >
+                  <FileUp size={14} /> Upload Tender
+                </Link>
+              }
+            />
+            <CardBody className="!px-0">
+              {loading ? (
+                <div className="px-6">
+                  <SkeletonList rows={4} />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  {PIPELINE_STAGES.map((s) => (
-                    <div key={s.key} className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        <span className={`w-2 h-2 rounded-full ${s.tone}`} />
-                        {s.label}
-                      </span>
-                      <span className="font-semibold tabular-nums">{pipelineCounts[s.key]}</span>
-                    </div>
-                  ))}
+              ) : recentMissions.length === 0 ? (
+                <div className="px-6">
+                  <EmptyState
+                    compact
+                    icon={Radar}
+                    title="No tenders yet"
+                    description="Upload a tender to start your first mission."
+                    action={
+                      <Link to="/tenders/new" className="text-sm font-medium text-primary hover:underline">
+                        Upload a tender →
+                      </Link>
+                    }
+                  />
                 </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-muted-foreground uppercase tracking-wide border-b border-border">
+                        <th className="px-6 py-2.5 font-medium">Tender</th>
+                        <th className="px-3 py-2.5 font-medium hidden sm:table-cell">Uploaded On</th>
+                        <th className="px-3 py-2.5 font-medium">Status</th>
+                        <th className="px-3 py-2.5 font-medium">Evaluation Status</th>
+                        <th className="px-3 py-2.5 font-medium text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {recentMissions.map((m) => (
+                        <tr key={m.id} className="hover:bg-surface-hover transition-colors">
+                          <td className="px-6 py-3">
+                            <Link to={`/missions/${m.id}`} className="flex items-center gap-3 min-w-0 group">
+                              <div className="w-8 h-8 rounded-lg bg-danger-soft text-danger flex items-center justify-center shrink-0 text-[9px] font-bold">
+                                PDF
+                              </div>
+                              <span className="font-medium truncate group-hover:text-primary transition-colors">{m.mission_type}</span>
+                            </Link>
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground tabular-nums hidden sm:table-cell">
+                            {new Date(m.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="inline-flex items-center rounded-full bg-info-soft text-info px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
+                              Uploaded
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <Badge value={m.status} label={EVAL_STATUS_LABEL[m.status]} withIcon />
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <Menu
+                              align="right"
+                              label={`Actions for ${m.mission_type}`}
+                              trigger={
+                                <span className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-surface-hover hover:text-foreground">
+                                  <MoreVertical size={15} />
+                                </span>
+                              }
+                            >
+                              <MenuItem icon={<FileSearch size={14} />} onClick={() => navigate(`/missions/${m.id}`)}>
+                                View Details
+                              </MenuItem>
+                              {m.status === "created" && (
+                                <MenuItem
+                                  icon={<Sparkles size={14} />}
+                                  onClick={() => handleRunFullAnalysis(m.id)}
+                                >
+                                  {runningId === m.id ? "Running…" : "Run Full Analysis"}
+                                </MenuItem>
+                              )}
+                            </Menu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardBody>
+            {missions.length > recentMissions.length && (
+              <div className="px-6 py-3 border-t border-border">
+                <Link to="/missions" className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1">
+                  View all tenders <ArrowRight size={13} />
+                </Link>
               </div>
             )}
-          </CardBody>
-        </Card>
+          </Card>
 
-        <Card className="h-full flex flex-col">
-          <CardHeader title="Recent Tender Evaluations" description={evaluations.length ? `${evaluations.length} evaluated` : undefined} />
-          <CardBody className="!px-0 flex-1">
-            {loading ? (
-              <div className="px-6">
-                <SkeletonList rows={3} />
+          <Card>
+            <CardHeader title="Getting the most out of BidOps" description="Follow these steps to streamline your tender evaluation process." />
+            <CardBody>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {onboardingSteps.map((s) => (
+                  <Link key={s.title} to={s.to} className="flex items-start gap-3 group">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <s.icon size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold group-hover:text-primary transition-colors">{s.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{s.description}</p>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            ) : recentEvaluations.length === 0 ? (
-              <div className="px-6">
+            </CardBody>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          {/* Honest by design: the backend only tracks mission status at one
+              granularity (created/running/awaiting_approval/completed/
+              archived) -- there's no field for step-by-step progress or a
+              live percentage, so this shows the real running mission and
+              its real status rather than inventing a progress bar the
+              system can't actually back up. */}
+          <Card>
+            <CardHeader title="Ongoing Analysis" />
+            <CardBody>
+              {loading ? (
+                <SkeletonList rows={2} />
+              ) : runningMission ? (
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <p className="text-sm font-medium truncate">{runningMission.mission_type}</p>
+                    <Badge value="running" label="Analysis Running" withIcon />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 size={13} className="animate-spin text-primary shrink-0" />
+                    AI engine processing — this can take a few minutes.
+                  </div>
+                </div>
+              ) : (
                 <EmptyState
                   compact
-                  icon={Sparkles}
-                  title="No recommendations yet"
-                  description="Upload a tender and run it through the Decision Engine to see your first recommendation here."
-                  action={
-                    <Link to="/tenders/new" className="text-sm font-medium text-primary hover:underline">
-                      Upload a tender →
-                    </Link>
-                  }
+                  icon={Loader2}
+                  title="Nothing running right now"
+                  description="Run a full analysis from Tender Workspace to see live status here."
                 />
-              </div>
-            ) : (
-              <ul className="divide-y divide-border">
-                {recentEvaluations.map(({ mission, evaluation }) => (
-                  <li key={mission.id} className="px-6 py-3 flex items-center justify-between gap-3">
-                    <Link to={`/missions/${mission.id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Recent Activity" action={<Link to="/missions" className="text-xs font-medium text-primary hover:underline">View all</Link>} />
+            <CardBody className="!px-0">
+              {loading ? (
+                <div className="px-6">
+                  <SkeletonList rows={3} />
+                </div>
+              ) : recentActivity.length === 0 ? (
+                <div className="px-6">
+                  <EmptyState compact icon={Sparkles} title="No activity yet" description="Activity will appear here as you upload and evaluate tenders." />
+                </div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {recentActivity.map((a) => (
+                    <li key={a.id} className="px-6 py-3 flex items-start gap-3">
                       <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        <Target size={14} />
+                        <a.icon size={14} />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{mission.mission_type}</p>
-                        <p className="text-xs text-muted-foreground tabular-nums">
-                          {new Date(mission.completed_at ?? mission.created_at).toLocaleDateString()}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{a.label}</p>
+                        <p className="text-xs text-muted-foreground truncate">{a.detail}</p>
                       </div>
-                    </Link>
-                    <div className="text-right shrink-0">
-                      <Badge
-                        value={evaluation.recommendation.recommendation_type}
-                        label={recommendationLabel(evaluation.recommendation.recommendation_type)}
-                        withIcon
-                      />
-                      {evaluation.recommendation.overall_confidence != null && (
-                        <p className="text-xs text-muted-foreground mt-1 tabular-nums">
-                          {Math.round(evaluation.recommendation.overall_confidence * 100)}% confidence
-                        </p>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card className="h-full flex flex-col">
-          <CardHeader title="AI Insights" description="Derived from your evaluation history" />
-          <CardBody className="flex-1">
-            {loading ? (
-              <SkeletonList rows={2} />
-            ) : topInsight ? (
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Sparkles size={15} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Most common gap</p>
-                  <p className="text-sm leading-relaxed">{topInsight.description}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Appeared in {topInsight.count} of {evaluations.length} evaluated mission(s)
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <EmptyState compact icon={Sparkles} title="No insights yet" description="Insights appear once you have evaluated missions." />
-            )}
-          </CardBody>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        <Card className="h-full flex flex-col lg:col-span-1">
-          <CardHeader title="Requirement Compliance" description={complianceTotal ? `${complianceTotal} requirements evaluated` : undefined} />
-          <CardBody className="flex-1 flex items-center">
-            {loading ? (
-              <SkeletonList rows={1} />
-            ) : complianceTotal === 0 ? (
-              <EmptyState compact icon={TrendingUp} title="No data yet" description="Run the Decision Engine on a tender to see compliance breakdown." />
-            ) : (
-              <StatusDonut segments={complianceSegments} centerLabel={`${complianceAvgPct}%`} />
-            )}
-          </CardBody>
-        </Card>
-
-        <Card className="h-full flex flex-col lg:col-span-2">
-          <CardHeader title="Quick Actions" />
-          <CardBody className="flex-1">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <QuickAction to="/tenders/new" icon={FileStack} label="Upload Tender" />
-              <QuickAction to="/documents" icon={FileStack} label="Upload Documents" />
-              <QuickAction to="/capabilities" icon={Layers} label="Build Capabilities" />
-              <QuickAction to="/missions" icon={Radar} label="Tender Workspace" />
-            </div>
-          </CardBody>
-        </Card>
+                      <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{new Date(a.at).toLocaleDateString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+        </div>
       </div>
     </div>
-  );
-}
-
-function QuickAction({ to, icon: Icon, label }: { to: string; icon: typeof FileStack; label: string }) {
-  return (
-    <Link
-      to={to}
-      className="flex flex-col items-start gap-2 rounded-lg border border-border p-3.5 hover:border-primary/40 hover:bg-primary/[0.03] transition-colors"
-    >
-      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-        <Icon size={15} />
-      </div>
-      <span className="text-sm font-medium leading-tight">{label}</span>
-    </Link>
   );
 }

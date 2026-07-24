@@ -1,4 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { cn } from "../../lib/cn";
 
 export function Card({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
@@ -53,25 +54,39 @@ export function StatCard({
   icon,
   trend,
   tone = "neutral",
+  linkTo,
+  linkLabel,
 }: {
   label: string;
   value: string | number;
   icon?: ReactNode;
   trend?: string;
   tone?: StatTone;
+  // Optional "View all X ->" footer link -- additive, every existing
+  // caller that doesn't pass these renders exactly as before.
+  linkTo?: string;
+  linkLabel?: string;
 }) {
   return (
-    <Card className="p-5 transition-shadow hover:shadow-elevated">
+    <Card className="p-5 transition-shadow hover:shadow-elevated flex flex-col">
       <div className="flex items-start justify-between">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
         {icon && (
-          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", statToneClasses[tone])}>
+          <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", statToneClasses[tone])}>
             {icon}
           </div>
         )}
       </div>
       <p className="text-3xl font-semibold tracking-tight mt-3 tabular-nums">{value}</p>
       {trend && <p className="text-xs text-muted-foreground mt-1">{trend}</p>}
+      {linkTo && (
+        <Link
+          to={linkTo}
+          className="text-xs font-medium text-primary hover:underline mt-3 inline-flex items-center gap-1 pt-2 border-t border-border"
+        >
+          {linkLabel ?? "View all"} <span aria-hidden="true">→</span>
+        </Link>
+      )}
     </Card>
   );
 }
