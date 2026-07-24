@@ -1,4 +1,5 @@
-import { forwardRef, type InputHTMLAttributes, type SelectHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "../../lib/cn";
 
 const fieldBase =
@@ -8,15 +9,28 @@ const fieldBase =
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   hint?: string;
+  // Optional leading icon / trailing element (e.g. a show/hide password
+  // toggle) -- additive and backward compatible, every existing caller
+  // that doesn't pass these renders exactly as before.
+  icon?: LucideIcon;
+  trailing?: ReactNode;
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(({ label, hint, className, ...props }, ref) => (
-  <label className="block">
-    {label && <span className="text-xs font-medium text-foreground/90 mb-1.5 block">{label}</span>}
-    <input ref={ref} className={cn(fieldBase, className)} {...props} />
-    {hint && <span className="text-xs text-muted-foreground mt-1 block">{hint}</span>}
-  </label>
-));
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ label, hint, icon: Icon, trailing, className, ...props }, ref) => (
+    <label className="block">
+      {label && <span className="text-xs font-medium text-foreground/90 mb-1.5 block">{label}</span>}
+      <div className="relative">
+        {Icon && (
+          <Icon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        )}
+        <input ref={ref} className={cn(fieldBase, Icon && "pl-9", trailing && "pr-9", className)} {...props} />
+        {trailing && <div className="absolute right-3 top-1/2 -translate-y-1/2">{trailing}</div>}
+      </div>
+      {hint && <span className="text-xs text-muted-foreground mt-1 block">{hint}</span>}
+    </label>
+  )
+);
 Input.displayName = "Input";
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
