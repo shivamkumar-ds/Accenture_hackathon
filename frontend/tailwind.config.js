@@ -58,6 +58,8 @@ export default {
           foreground: "hsl(var(--brand-foreground) / <alpha-value>)",
           accent: "hsl(var(--brand-accent) / <alpha-value>)",
         },
+        "logo-gradient-from": "hsl(var(--logo-gradient-from) / <alpha-value>)",
+        "logo-gradient-to": "hsl(var(--logo-gradient-to) / <alpha-value>)",
       },
       borderRadius: {
         sm: "calc(var(--radius) - 4px)",

@@ -1,6 +1,13 @@
 # BidOps — Design System
 
-**Status:** v1.0 (Founding Design Principles) — **Frozen**
+**Status:** v1.0 (Founding Design Principles) — **Frozen**, with one amendment below.
+
+> **Amendment (see `backend/99_DECISIONS_LOG.md` D-147):** §6's "purple gradients... avoided"
+> guidance has been explicitly superseded. The official BidOps AI logo is now an indigo/violet
+> gradient mark, and that same gradient is the app's primary/interactive color everywhere — a
+> deliberate founder decision, not drift. Everything else in this document (the design
+> philosophy, brand personality, typography, and every other color/interaction principle) still
+> applies unchanged; only the specific "deep blue, no purple" color choice in §6 was reversed.
 
 This document captures the guiding design philosophy of BidOps. It is a set of enduring
 principles, not a pixel-perfect specification or a component library. It exists to keep every

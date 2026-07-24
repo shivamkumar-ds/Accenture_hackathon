@@ -3,16 +3,20 @@
 @tailwind utilities;
 
 /*
-  Design tokens -- sourced from docs/DESIGN_SYSTEM.md v1.0 (frozen).
+  Design tokens -- v2.0 (supersedes DESIGN_SYSTEM.md v1.0's deep-blue
+  palette, per explicit founder decision during the frontend visual pass:
+  the new official BidOps AI mark and primary/interactive color are this
+  indigo-to-violet gradient, matching the approved logo. v1.0 deliberately
+  rejected purple/violet ("no purple, no violet, no second competing
+  accent") in favor of deep blue -- that reasoning no longer applies now
+  that the actual brand mark itself is a violet gradient; keeping the
+  interactive color independent of the logo's own color would look like
+  two unrelated brands. See 99_DECISIONS_LOG.md for the entry recording
+  this reversal.
 
-  Palette principle (§4/§6 of the Design System): ONE accent color, used
-  sparingly, chosen because it reinforces BidOps's personality (evidence,
-  trust, precision, calm), not because a competitor avoids it. Deep blue
-  is the primary/interactive color; a single muted teal is the only other
-  hue in the system, reserved for evidence/traceability emphasis (the
-  "View evidence" / source-clause trail on the Decision Screen). No
-  purple, no violet, no second competing accent -- this replaces the
-  earlier indigo/violet palette, which predates the frozen Design System.
+  --brand-accent (muted teal) is UNCHANGED -- it serves a distinct
+  semantic purpose (evidence/traceability emphasis on the Decision
+  Screen), not brand identity, and this pass didn't touch it.
 
   Semantic status colors (success/warning/danger/info) are a separate
   system serving compliance-status meaning, not brand decoration, and are
@@ -28,16 +32,19 @@
   --surface-hover: 220 20% 96.5%;
   --border: 220 14% 90%;
   --input: 220 14% 88%;
-  --ring: 217 60% 42%;
+  --ring: 262 83% 52%;
 
   --muted: 216 24% 93%;
   --muted-foreground: 215 16% 42%; /* slate */
 
-  --primary: 217 60% 38%; /* deep blue */
-  --primary-hover: 217 64% 30%;
+  --primary: 262 83% 58%; /* violet-600 -- matches the logo gradient's darker stop */
+  --primary-hover: 263 70% 50%; /* violet-700 */
   --primary-foreground: 0 0% 100%;
 
-  --brand-accent: 174 55% 28%; /* single accent: muted teal, evidence/traceability emphasis only */
+  --logo-gradient-from: 239 84% 67%; /* indigo-500 -- logo gradient's lighter stop */
+  --logo-gradient-to: 262 83% 58%; /* violet-600 -- matches --primary */
+
+  --brand-accent: 174 55% 28%; /* unchanged: muted teal, evidence/traceability emphasis only */
 
   --accent: 222 24% 12%;
   --accent-foreground: 0 0% 100%;
@@ -62,7 +69,7 @@
      split panel) that should never flip with light/dark mode. Previously
      these surfaces used --accent (which DOES flip) with hardcoded white
      text on top, so dark mode broke contrast. */
-  --brand: 221 42% 13%; /* deep navy-slate, same hue family as --primary */
+  --brand: 262 40% 14%; /* deep violet-charcoal, same hue family as the new --primary */
   --brand-foreground: 0 0% 100%;
 
   --radius: 0.625rem;
@@ -75,14 +82,17 @@
   --surface-hover: 224 22% 13%;
   --border: 222 18% 18%;
   --input: 222 18% 20%;
-  --ring: 217 65% 62%;
+  --ring: 262 85% 70%;
 
   --muted: 222 18% 14%;
   --muted-foreground: 220 12% 65%;
 
-  --primary: 217 65% 58%;
-  --primary-hover: 217 65% 66%;
+  --primary: 262 85% 68%;
+  --primary-hover: 262 85% 74%;
   --primary-foreground: 224 28% 9%;
+
+  --logo-gradient-from: 239 84% 72%;
+  --logo-gradient-to: 262 85% 68%;
 
   --brand-accent: 174 45% 48%;
 
@@ -104,7 +114,7 @@
   --info: 217 80% 65%;
   --info-soft: 217 40% 15%;
 
-  --brand: 221 42% 13%;
+  --brand: 262 40% 14%;
   --brand-foreground: 0 0% 100%;
 }
 

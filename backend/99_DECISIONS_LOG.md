@@ -922,3 +922,50 @@ sandbox — no network access to upgrade its own build environment); this remain
 area, stated as such rather than assumed clean. Real deployment (backend/frontend), testing with
 real tender PDFs, and pilot-user observation are the next steps in the founder's stated sequence
 but require real infrastructure/customer access outside what this pass could execute.
+
+## D-147 — Brand palette reversed: deep blue → indigo/violet gradient (supersedes DESIGN_SYSTEM.md v1.0)
+
+**What:** Replaced the frozen deep-blue `--primary` token and flat-fill `LogoMark` with an
+indigo-to-violet gradient, across the entire app (landing page, Dashboard, sidebar, buttons,
+Login split panel), not just the marketing landing page being built in this same session. New
+tokens added: `--logo-gradient-from` (indigo-500), `--logo-gradient-to` (violet-600, same hue
+also used as the new flat `--primary`). `--brand` (Login panel dark surface) recolored to a deep
+violet-charcoal to match. `--brand-accent` (muted teal, evidence/traceability emphasis on the
+Decision Screen) is unchanged — it serves a distinct semantic purpose, not brand identity, and
+this decision doesn't touch it.
+
+**Why:** The founder supplied a new official logo image (indigo/violet gradient monogram) and
+explicitly asked for it, and its color, to become "the official color of our entire SaaS," used
+everywhere. This directly reverses DESIGN_SYSTEM.md v1.0's explicit rule ("no purple, no violet,
+no second competing accent... deep blue is the primary/interactive color"), which itself was a
+deliberate rejection of an earlier indigo/violet identity. Flagged this conflict to the founder
+before touching anything, including that it would affect the entire authenticated app, not just
+the landing page (which had a separate, narrower "UI freeze lifted" exception already agreed for
+this session) — founder explicitly confirmed applying it everywhere, formally superseding v1.0.
+
+**Alternatives considered:** Using the new logo only on the public landing page while leaving the
+authenticated app on the old deep-blue system, so the internal product and the marketing site
+would carry two different identities. **Why rejected:** explicitly declined by the founder when
+asked — a split identity was called out as worse than a full, consistent switch.
+
+**Implementation note:** `LogoMark`'s SVG structure (rounded badge, "B" glyph, sparkle accents)
+is unchanged — only its fill switched from a flat `--primary` color to a `<linearGradient>`
+matching the new tokens, with the gradient `id` generated per-instance via `useId()` since the
+mark renders multiple times on the same page (sidebar, navbar, footer, login) and a hardcoded
+duplicate SVG gradient id can misbehave across repeated inline `<svg>` elements. This is a
+faithful color/spirit match to the founder's reference mark, not a pixel-traced reproduction of
+its more elaborate illustrated glyph — reproducing that exactly would mean hand-authoring a
+materially more complex multi-shaded path than the simple rounded-badge treatment already used
+everywhere the mark appears in the product.
+
+**Verified before considering this done:**
+- Frontend: `tsc -b` clean, `vite build` succeeds.
+- Confirmed the compiled CSS actually contains both new gradient stop-color declarations
+  (`grep`'d the built `dist/assets/index-*.css` output directly, not just eyeballed the source).
+- Checked visually via screenshots from the founder after each change (spacing/layout passes
+  before this one).
+
+**Not done in this pass:** No static logo/favicon image assets (PNG/ICO/SVG files in `public/`)
+exist to swap — the mark is rendered entirely as inline SVG via `LogoMark`, so there was nothing
+additional to replace there. If real exported brand assets are produced later, they should
+replace the inline SVG the same way the previous flat-fill version's own comment anticipated.
