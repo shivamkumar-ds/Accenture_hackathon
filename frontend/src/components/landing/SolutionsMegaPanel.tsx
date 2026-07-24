@@ -60,7 +60,7 @@ export function SolutionsMegaPanel() {
         })}
       </div>
 
-      <div className="mt-4 rounded-xl bg-primary/5 border border-primary/15 px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="mt-4 rounded-xl bg-primary/5 border border-primary/15 px-5 py-4 flex flex-col sm:flex-row items-center justify-center gap-4 text-center sm:text-left">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <Sparkles size={15} />
