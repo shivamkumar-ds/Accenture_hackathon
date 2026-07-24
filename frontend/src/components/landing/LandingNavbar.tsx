@@ -179,7 +179,13 @@ export function LandingNavbar() {
       </div>
 
       {activeKey && (
-        <div className="hidden lg:block border-t border-border bg-background animate-fade-in">
+        // Panel is inside the sticky navbar, so if its content (e.g. the
+        // 8-card Solutions grid) is taller than the viewport, the whole
+        // sticky box grows past the fold and page scroll appears "stuck"
+        // until you scroll past its full height. Capping it to the
+        // remaining viewport height (100vh - navbar height) and scrolling
+        // internally keeps normal page scroll working at all times.
+        <div className="hidden lg:block border-t border-border bg-background animate-fade-in max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <MenuPanel activeKey={activeKey} />
           </div>
@@ -187,7 +193,7 @@ export function LandingNavbar() {
       )}
 
       {mobileOpen && (
-        <div className="lg:hidden border-t border-border bg-background px-4 py-4 space-y-1 animate-fade-in">
+        <div className="lg:hidden border-t border-border bg-background px-4 py-4 space-y-1 animate-fade-in max-h-[calc(100vh-4rem)] overflow-y-auto">
           {DROPDOWN_ITEMS.map((item) => (
             <div key={item.key}>
               <button
