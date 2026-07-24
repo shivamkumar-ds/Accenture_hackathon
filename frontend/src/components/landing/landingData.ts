@@ -318,6 +318,9 @@ export const solutionVerticals: DropdownCard[] = [
   },
 ];
 
+// Orphaned since the How It Works dropdown moved to the 7-step
+// processSteps timeline below (per the founder-approved reference). Left
+// in place in case a simpler 4-step summary is useful elsewhere later.
 export const howItWorks: DropdownCard[] = [
   {
     icon: FileUp,
@@ -358,6 +361,109 @@ export const howItWorks: DropdownCard[] = [
       "Every verdict is paired with a written reason, not a black-box score",
       "One-click PDF export for offline circulation",
     ],
+  },
+];
+
+export interface ProcessStep {
+  step: number;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  color: { bg: string; text: string };
+}
+
+// The 7-step "How It Works" timeline -- matches the approved reference
+// exactly. Each step maps to a real stage of the actual product flow
+// (Documents -> Capabilities -> Tender upload -> Extraction -> Matching
+// -> Evidence/Gap review -> Decision), not an aspirational workflow.
+export const processSteps: ProcessStep[] = [
+  {
+    step: 1,
+    icon: FileUp,
+    title: "Upload Company Documents",
+    description: "Upload your company certificates, past projects, financials, and other capability documents.",
+    color: { bg: "bg-blue-50", text: "text-blue-600" },
+  },
+  {
+    step: 2,
+    icon: Building2,
+    title: "Build Capability Library",
+    description: "Our AI reads and organizes your documents to build a structured, searchable capability library.",
+    color: { bg: "bg-emerald-50", text: "text-emerald-600" },
+  },
+  {
+    step: 3,
+    icon: FileText,
+    title: "Upload Tender Document",
+    description: "Upload the tender/RFP document you want to evaluate. We support PDF and scanned files.",
+    color: { bg: "bg-violet-50", text: "text-violet-600" },
+  },
+  {
+    step: 4,
+    icon: Sparkles,
+    title: "AI Extracts Requirements",
+    description: "BidOps AI extracts and classifies all requirements, clauses, and eligibility criteria automatically.",
+    color: { bg: "bg-orange-50", text: "text-orange-600" },
+  },
+  {
+    step: 5,
+    icon: Gauge,
+    title: "AI Matches & Evaluates",
+    description: "Our Decision Engine matches tender requirements with your capabilities and evaluates compliance.",
+    color: { bg: "bg-sky-50", text: "text-sky-600" },
+  },
+  {
+    step: 6,
+    icon: FileSearch,
+    title: "Evidence & Gap Analysis",
+    description: "Review matched evidence for each requirement and identify gaps with recommended actions.",
+    color: { bg: "bg-purple-50", text: "text-purple-600" },
+  },
+  {
+    step: 7,
+    icon: FileBarChart2,
+    title: "Get Decision & Report",
+    description: "Get an evidence-backed GO / NO-GO recommendation with a comprehensive report.",
+    color: { bg: "bg-teal-50", text: "text-teal-600" },
+  },
+];
+
+export interface ProcessTrustPoint {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}
+
+// Bottom trust row for the How It Works panel -- deliberately reuses the
+// same honest claims already established for the page's main trust row
+// (trustStatements below), just with a one-line description each, rather
+// than inventing a new "Google Gemini Powered" style claim that overstates
+// which model provider is actually primary today.
+export const processTrustPoints: ProcessTrustPoint[] = [
+  {
+    icon: ShieldCheck,
+    title: "Evidence-Backed",
+    description: "Every recommendation is supported with references.",
+  },
+  {
+    icon: FileSearch,
+    title: "Explainable AI",
+    description: "Transparent matching with clause-level explainability.",
+  },
+  {
+    icon: Lock,
+    title: "Enterprise Grade Security",
+    description: "Your data is private, secure and access-scoped to your company.",
+  },
+  {
+    icon: Sparkles,
+    title: "AI-Powered Analysis",
+    description: "Advanced reasoning for complex procurement documents.",
+  },
+  {
+    icon: Users,
+    title: "Built for Teams",
+    description: "Collaborate, review and make confident decisions.",
   },
 ];
 
