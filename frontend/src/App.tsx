@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
 import Layout from "./components/Layout";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Documents from "./pages/Documents";
@@ -25,6 +26,13 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
+      {/* Public marketing landing page -- only reachable at "/" while
+          signed out. Once authenticated, the second "/" route below
+          (inside RequireAuth + Layout) takes over instead, so this
+          doesn't touch any existing authenticated route or internal
+          link -- every "/documents", "/tenders/new" etc. link in the
+          app is untouched by this. */}
+      {!isAuthenticated && <Route path="/" element={<Landing />} />}
       <Route
         element={
           <RequireAuth>
