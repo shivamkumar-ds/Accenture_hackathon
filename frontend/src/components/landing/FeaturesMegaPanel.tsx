@@ -14,29 +14,22 @@ export function FeaturesMegaPanel() {
 
   return (
     <div>
-      {/* Intro block -- same single-column layout as the Solutions panel */}
-      <div className="mb-8">
+      {/* Intro block -- centered, matching Solutions/How It Works */}
+      <div className="text-center mb-8">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
           <Sparkles size={12} />
           Powerful features, purpose-built for procurement
         </span>
-        <h2 className="mt-4 text-2xl lg:text-3xl font-bold tracking-tight leading-[1.1] text-foreground lg:whitespace-nowrap">
+        <h2 className="mt-4 text-2xl lg:text-3xl font-bold tracking-tight leading-[1.1] text-foreground">
           Everything You Need to Win More Tenders.
         </h2>
-        <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-lg">
+        <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
           BidOps AI brings together document intelligence, capability management, compliance automation, and
           decision intelligence in a single platform designed for modern procurement teams.
         </p>
       </div>
 
-      {/* Core features + category filter */}
-      <div className="text-center mb-6">
-        <h3 className="text-lg font-bold tracking-tight text-foreground">Our Core Features</h3>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          A complete suite of AI-powered tools to streamline your tender lifecycle.
-        </p>
-      </div>
-
+      {/* Category filter */}
       <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
         {featureCategories.map((cat) => (
           <button
