@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { CalendarDays, ChevronDown, KeyRound, Menu as MenuIcon, X } from "lucide-react";
 import { Button, Logo } from "../kit";
 import { cn } from "../../lib/cn";
-import { features, howItWorks, type DropdownCard } from "./landingData";
+import { howItWorks, type DropdownCard } from "./landingData";
 import { SolutionsMegaPanel } from "./SolutionsMegaPanel";
+import { FeaturesMegaPanel } from "./FeaturesMegaPanel";
 
 // Trimmed down per explicit founder direction: only Solutions, Features,
 // How It Works, Pricing, Contact -- Industries, Resources, and About
@@ -71,12 +72,7 @@ function MenuPanel({ activeKey }: { activeKey: DropdownKey }) {
   }
 
   if (activeKey === "features") {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Features</p>
-        <CardGrid cards={features} />
-      </div>
-    );
+    return <FeaturesMegaPanel />;
   }
 
   // how-it-works
