@@ -18,7 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { cn } from "../lib/cn";
-import { AICreditsCard, LiveClock, Logo, Menu, MenuDivider, MenuItem, Switch } from "./kit";
+import { LiveClock, Logo, Menu, MenuDivider, MenuItem, Switch } from "./kit";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -55,8 +55,9 @@ export default function Layout() {
           switched to `static` at the lg breakpoint, which meant the aside
           became a normal flex child that stretched to match the *main
           content column's* height instead of the viewport's -- on a tall
-          dashboard, that pushed the AI Credits card down along with it,
-          off-screen, so it was only reachable by scrolling the whole page.
+          dashboard, that pushed the bottom of the sidebar (and its nav
+          items) down along with it, off-screen, so it was only reachable
+          by scrolling the whole page.
           The content column below gets `lg:ml-60` to reserve the space a
           fixed element doesn't occupy in normal flow. */}
       <aside
@@ -98,13 +99,6 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-
-        <div className="px-3 pb-4 shrink-0">
-          <AICreditsCard
-            onUpgrade={() => notify("info", "Billing isn't live yet — this is a preview of the upcoming plan experience.")}
-            onPurchase={() => notify("info", "Credit purchases aren't live yet — this is a preview of the upcoming plan experience.")}
-          />
-        </div>
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col lg:ml-60">

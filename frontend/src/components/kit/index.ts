@@ -12,5 +12,4 @@ export * from "./Clock";
 export * from "./Logo";
 export * from "./Switch";
 export * from "./Menu";
-export * from "./AICreditsCard";
 export * from "./StatusDonut";
