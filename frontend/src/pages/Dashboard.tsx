@@ -31,7 +31,6 @@ import {
   MoreVertical,
   Radar,
   Sparkles,
-  Target,
 } from "lucide-react";
 
 // Real MissionStatus values, relabeled for the "Evaluation Status" column --
@@ -43,15 +42,6 @@ const EVAL_STATUS_LABEL: Record<MissionStatus, string> = {
   completed: "Completed",
   archived: "Archived",
 };
-
-// Explains the real product flow -- no invented steps, matches how the app
-// actually works end to end.
-const onboardingSteps = [
-  { icon: FileUp, title: "Upload Tender", description: "Upload tender documents in PDF format.", to: "/tenders/new" },
-  { icon: Sparkles, title: "AI Analysis", description: "Our AI engine extracts requirements & eligibility criteria.", to: "/tenders/new" },
-  { icon: Layers, title: "Capability Match", description: "Matches requirements against your organizational capabilities.", to: "/capabilities" },
-  { icon: Target, title: "Get Recommendation", description: "Receive a GO / NO-GO recommendation with a full report.", to: "/reports" },
-];
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -399,25 +389,6 @@ export default function Dashboard() {
                 </Link>
               </div>
             )}
-          </Card>
-
-          <Card>
-            <CardHeader title="Getting the most out of BidOps" description="Follow these steps to streamline your tender evaluation process." />
-            <CardBody>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {onboardingSteps.map((s) => (
-                  <Link key={s.title} to={s.to} className="flex items-start gap-3 group">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                      <s.icon size={16} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold group-hover:text-primary transition-colors">{s.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{s.description}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </CardBody>
           </Card>
         </div>
 
