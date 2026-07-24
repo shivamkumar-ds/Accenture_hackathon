@@ -4,6 +4,7 @@ import { executeMission, getCapabilityGraph, getEvaluation, listMissions } from 
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
+import { tenderDisplayName } from "../lib/tenderName";
 import type { CapabilityGraphResponse, EvaluationResponse, MissionRead, MissionStatus } from "../api/types";
 import {
   Badge,
@@ -104,9 +105,9 @@ export default function Dashboard() {
     const items: Item[] = [];
 
     missions.forEach((m) => {
-      items.push({ id: `up-${m.id}`, icon: FileUp, label: "Tender uploaded", detail: m.mission_type, at: m.created_at });
+      items.push({ id: `up-${m.id}`, icon: FileUp, label: "Tender uploaded", detail: tenderDisplayName(m), at: m.created_at });
       if (m.completed_at) {
-        items.push({ id: `done-${m.id}`, icon: CheckCircle2, label: "Evaluation completed", detail: m.mission_type, at: m.completed_at });
+        items.push({ id: `done-${m.id}`, icon: CheckCircle2, label: "Evaluation completed", detail: tenderDisplayName(m), at: m.completed_at });
       }
     });
 
@@ -275,7 +276,7 @@ export default function Dashboard() {
                               <div className="w-8 h-8 rounded-lg bg-danger-soft text-danger flex items-center justify-center shrink-0 text-[9px] font-bold">
                                 PDF
                               </div>
-                              <span className="font-medium truncate group-hover:text-primary transition-colors">{m.mission_type}</span>
+                              <span className="font-medium truncate group-hover:text-primary transition-colors">{tenderDisplayName(m)}</span>
                             </Link>
                           </td>
                           <td className="px-3 py-3 text-muted-foreground tabular-nums hidden sm:table-cell">
@@ -300,7 +301,7 @@ export default function Dashboard() {
                             <div className="flex justify-end">
                               <Menu
                                 align="right"
-                                label={`Actions for ${m.mission_type}`}
+                                label={`Actions for ${tenderDisplayName(m)}`}
                                 trigger={
                                   <span className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-surface-hover hover:text-foreground">
                                     <MoreVertical size={15} />
@@ -352,7 +353,7 @@ export default function Dashboard() {
               ) : runningMission ? (
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <p className="text-sm font-medium truncate">{runningMission.mission_type}</p>
+                    <p className="text-sm font-medium truncate">{tenderDisplayName(runningMission)}</p>
                     <Badge value="running" label="Analysis Running" withIcon />
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">

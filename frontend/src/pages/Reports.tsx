@@ -5,6 +5,7 @@ import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import { recommendationLabel } from "../lib/recommendationLabels";
 import { mergeRequirementContext } from "../lib/complianceMerge";
+import { tenderDisplayName } from "../lib/tenderName";
 import type { EvaluationResponse, MissionRead } from "../api/types";
 import {
   Badge,
@@ -89,7 +90,7 @@ export default function Reports() {
       const { generateEvaluationPdf } = await import("../lib/pdfReport");
       generateEvaluationPdf(evaluation, merged, {
         companyName,
-        missionType: selectedMission.mission_type,
+        missionType: tenderDisplayName(selectedMission),
         missionId: selectedMission.id,
       });
     } catch {
@@ -137,7 +138,7 @@ export default function Reports() {
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate">{m.mission_type}</p>
+                        <p className="truncate">{tenderDisplayName(m)}</p>
                         <Badge value={m.status} />
                       </div>
                       <p className="text-xs text-muted-foreground tabular-nums mt-0.5">
@@ -174,7 +175,7 @@ export default function Reports() {
               <Card>
                 <CardHeader
                   title="Report Preview"
-                  description={selectedMission.mission_type}
+                  description={tenderDisplayName(selectedMission)}
                   action={
                     <Button size="sm" icon={<Download size={14} />} loading={generatingPdf} onClick={handleDownload}>
                       Download PDF Report

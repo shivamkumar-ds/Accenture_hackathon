@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models import User
+from app.models import Document, Mission, Tender, User
 from app.schemas.decision import RecommendationRead
 from app.schemas.mission import MissionRead
 from app.services import decision_service, mission_service
@@ -23,12 +23,44 @@ from app.services.exceptions import ConflictError, ExtractionError, NotFoundErro
 router = APIRouter(prefix="/missions", tags=["missions"])
 
 
+def _attach_tender_info(db: Session, missions: list[Mission]) -> list[MissionRead]:
+    """Enrich MissionRead with the real tender identity (see MissionRead's
+    tender_id/tender_name comment). One batched query for both Tender and
+    Document, regardless of how many missions are being listed, to avoid
+    N+1 queries on the Dashboard/Tender Workspace list views."""
+    if not missions:
+        return []
+
+    mission_ids = [m.id for m in missions]
+    tenders = db.query(Tender).filter(Tender.mission_id.in_(mission_ids)).all()
+    tender_by_mission = {t.mission_id: t for t in tenders}
+
+    doc_ids = [t.uploaded_document for t in tenders if t.uploaded_document]
+    doc_by_id = {}
+    if doc_ids:
+        doc_by_id = {d.id: d for d in db.query(Document).filter(Document.id.in_(doc_ids)).all()}
+
+    results = []
+    for mission in missions:
+        read = MissionRead.model_validate(mission)
+        tender = tender_by_mission.get(mission.id)
+        if tender is not None:
+            read.tender_id = tender.id
+            document = doc_by_id.get(tender.uploaded_document) if tender.uploaded_document else None
+            # Prefer the name the user actually typed at upload; fall back
+            # to the real uploaded file name -- never mission_type, which
+            # is always the same fixed constant, not a tender identifier.
+            read.tender_name = tender.tender_name or (document.file_name if document else None)
+        results.append(read)
+    return results
+
+
 @router.get("", response_model=list[MissionRead])
 def list_missions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[MissionRead]:
-    return mission_service.list_missions(db, current_user.company_id)
+    return _attach_tender_info(db, mission_service.list_missions(db, current_user.company_id))
 
 
 @router.get("/{mission_id}", response_model=MissionRead)
@@ -38,9 +70,10 @@ def get_mission(
     db: Session = Depends(get_db),
 ) -> MissionRead:
     try:
-        return mission_service.get_mission(db, mission_id, current_user.company_id)
+        mission = mission_service.get_mission(db, mission_id, current_user.company_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _attach_tender_info(db, [mission])[0]
 
 
 @router.delete("/{mission_id}", response_model=MissionRead)

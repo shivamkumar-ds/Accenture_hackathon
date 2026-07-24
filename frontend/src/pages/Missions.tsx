@@ -6,6 +6,7 @@ import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
+import { tenderDisplayName } from "../lib/tenderName";
 import { ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, Radar } from "lucide-react";
 
 // The brief asked for a visual "story" of the tender journey (Upload ->
@@ -141,7 +142,7 @@ export default function Missions() {
                         {order}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold truncate">{m.mission_type}</p>
+                        <p className="font-semibold truncate">{tenderDisplayName(m)}</p>
                         <p className="text-xs text-muted-foreground tabular-nums mt-0.5">
                           Started {new Date(m.created_at).toLocaleDateString()}
                         </p>

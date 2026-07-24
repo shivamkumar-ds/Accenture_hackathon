@@ -247,6 +247,13 @@ export interface MissionRead {
   capability_snapshot_id: string | null;
   actual_outcome: string | null;
   outcome_notes: string | null;
+  // Real tender identity, resolved server-side from the linked Tender row
+  // (user-entered tender name, falling back to the uploaded file name) --
+  // mission_type is always the fixed constant "tender_evaluation" and was
+  // never a tender name. Only populated by GET /missions and
+  // GET /missions/:id; null on other mission action responses.
+  tender_id: string | null;
+  tender_name: string | null;
 }
 
 export interface ApiErrorDetail {
