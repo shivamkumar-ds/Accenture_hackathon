@@ -2,10 +2,10 @@ import { ArrowRight, FileSearch, Layers, ShieldCheck, FileBarChart2 } from "luci
 import { Button, Logo } from "../components/kit";
 import { LandingNavbar } from "../components/landing/LandingNavbar";
 import { DashboardPreview } from "../components/landing/DashboardPreview";
+import { ContactSection } from "../components/landing/ContactSection";
 import { trustStatements } from "../components/landing/landingData";
 
 const DEMO_MAILTO = "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Demo request — BidOps AI");
-const SALES_MAILTO = "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Sales enquiry — BidOps AI");
 
 const pills = [
   { icon: FileSearch, title: "AI Requirement Extraction", description: "Automatically extract tender requirements using AI." },
@@ -119,6 +119,8 @@ export default function Landing() {
         </div>
       </section>
 
+      <ContactSection />
+
       {/* Footer */}
       <footer id="company" className="bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
@@ -152,21 +154,6 @@ export default function Landing() {
                 </ul>
               </div>
             ))}
-
-            <div id="contact">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Contact</p>
-              <a href={DEMO_MAILTO} className="text-sm text-foreground/75 hover:text-primary transition-colors block">
-                bidops.ai@gmail.com
-              </a>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={() => (window.location.href = SALES_MAILTO)}
-              >
-                Contact Sales
-              </Button>
-            </div>
           </div>
 
           <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
