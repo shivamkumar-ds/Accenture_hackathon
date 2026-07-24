@@ -24,6 +24,8 @@ import {
   HelpCircle,
   Cloud,
   FileUp,
+  Monitor,
+  Users,
 } from "lucide-react";
 
 // Content for the marketing landing page only -- lives here rather than
@@ -166,6 +168,86 @@ export const features: DropdownCard[] = [
       "Rate limiting on every AI-cost-incurring and authentication endpoint",
       "Token-based authentication on every protected route",
       "Encrypted transport (TLS) for all traffic",
+    ],
+  },
+];
+
+// The Solutions mega-panel groups by industry vertical, not by abstract
+// feature -- matches the founder's approved reference layout exactly.
+// Same DropdownCard shape as everything else so it works with the same
+// expand-in-place "Learn more" pattern used throughout the site.
+export const solutionVerticals: DropdownCard[] = [
+  {
+    icon: HardHat,
+    title: "Construction & Infrastructure",
+    description: "Evaluate complex construction tenders with clause-level analysis and compliance intelligence.",
+    details: [
+      "Handles multi-phase infrastructure and EPC tender documents",
+      "Flags mandatory eligibility gaps (turnover, prior projects, certifications) automatically",
+      "Matches against your project completion and certification records",
+    ],
+  },
+  {
+    icon: Factory,
+    title: "Manufacturing",
+    description: "Assess technical and commercial requirements against your capabilities and certifications.",
+    details: [
+      "Matches quality and production certifications against tender requirements",
+      "Tracks equipment and facility records as reusable capability evidence",
+    ],
+  },
+  {
+    icon: Monitor,
+    title: "IT & Technology Services",
+    description: "Simplify RFP evaluation for IT projects, software, cloud, and managed services.",
+    details: [
+      "Matches technical delivery history and staff qualifications against RFP scope",
+      "Handles multi-phase software/services deliverable requirements",
+    ],
+  },
+  {
+    icon: HeartPulse,
+    title: "Healthcare",
+    description: "Ensure compliance and quality standards in medical equipment, hospital projects, and health sector tenders.",
+    details: [
+      "Matches regulatory and clinical-grade compliance requirements",
+      "Tracks equipment and safety certifications as reusable capability records",
+    ],
+  },
+  {
+    icon: Flame,
+    title: "Oil, Gas & Energy",
+    description: "Evaluate EPC, O&M, and supply tenders with advanced risk scoring and technical compliance.",
+    details: [
+      "Handles high-compliance safety and operational-history criteria",
+      "Matches technical delivery track record against tender scope",
+    ],
+  },
+  {
+    icon: Shield,
+    title: "Defence & Aerospace",
+    description: "Manage sensitive procurement with secure, traceable, and evidence-backed evaluation workflows.",
+    details: [
+      "Every recommendation carries a full evidence trail back to source documents",
+      "Strict tenant isolation keeps sensitive procurement data scoped to your organization",
+    ],
+  },
+  {
+    icon: Landmark,
+    title: "Government Contractors",
+    description: "Meet public procurement requirements with transparency, auditability, and policy compliance.",
+    details: [
+      "Navigates mandatory eligibility criteria common in public-sector tenders",
+      "Full audit trail from recommendation back to the original clause",
+    ],
+  },
+  {
+    icon: Users,
+    title: "Enterprise Procurement",
+    description: "Scale tender evaluations across teams with role-based access, collaboration, and centralized insights.",
+    details: [
+      "Company-scoped workspace shared across your evaluation team",
+      "Status tracking and an approval pipeline before a recommendation is finalized",
     ],
   },
 ];
