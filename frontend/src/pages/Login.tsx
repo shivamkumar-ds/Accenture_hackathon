@@ -11,6 +11,31 @@ import { ArrowLeft, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, Users } from
 const FORGOT_PASSWORD_MAILTO =
   "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Password reset request — BidOps");
 
+// Standard 4-color "G" mark -- lucide-react has no Google logo, so this is
+// a small inline SVG rather than pulling in a whole icon-pack dependency.
+function GoogleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#FFC107"
+        d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5Z"
+      />
+      <path
+        fill="#FF3D00"
+        d="m6.3 14.7 6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6 29.6 4 24 4c-7.4 0-13.8 4.2-17.1 10.3Z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.5 0 10.4-1.9 14.3-5.1l-6.6-5.6C29.6 34.9 26.9 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.2 39.7 16 44 24 44Z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4 5.6l6.6 5.6C41.6 36 44 30.7 44 24c0-1.3-.1-2.7-.4-3.5Z"
+      />
+    </svg>
+  );
+}
+
 // Honest, already-established claims restated as short cards -- no new
 // capabilities invented for this page.
 const loginHighlights = [
@@ -112,7 +137,7 @@ export default function Login() {
           aria-hidden="true"
           className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_50%_at_15%_25%,hsl(var(--primary)/0.08),transparent)]"
         />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 grid lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14 grid lg:grid-cols-[1.1fr_1fr] gap-12 items-start">
           {/* Left: pitch + real dashboard preview */}
           <div className="hidden lg:block">
             <h1 className="text-4xl font-bold tracking-tight text-foreground">
@@ -142,7 +167,7 @@ export default function Login() {
           </div>
 
           {/* Right: auth card */}
-          <div className="w-full max-w-md mx-auto">
+          <div className="w-full max-w-md lg:ml-auto">
             <div className="rounded-2xl border border-border bg-surface shadow-elevated p-6 lg:p-8">
               <div className="lg:hidden flex justify-center mb-6">
                 <Logo size={22} />
@@ -194,6 +219,23 @@ export default function Login() {
 
                   <Button type="submit" loading={loading} className="w-full" size="lg">
                     Sign In
+                  </Button>
+
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground">OR</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="w-full"
+                    onClick={() => notify("info", "Google sign-in is coming soon.")}
+                    icon={<GoogleIcon />}
+                  >
+                    Sign in with Google
                   </Button>
                 </form>
               ) : (
