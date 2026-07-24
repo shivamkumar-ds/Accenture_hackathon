@@ -6,35 +6,20 @@ layer rather than inline in the router, so the router/service/model
 separation exists from the first endpoint rather than being retrofitted
 once real business logic (Capability Builder, Decision Intelligence)
 arrives.
+
+create_company() was removed as part of RC-1 audit finding A1 — it
+duplicated auth_service.register()'s Company+Administrator creation but
+had no way to attach a user, and was exposed through an unauthenticated
+router endpoint. Company creation is now exclusively the atomic path in
+auth_service.register().
 """
 
 import uuid
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Company
-from app.schemas.company import CompanyCreate
-from app.services.exceptions import ConflictError, NotFoundError
-
-
-def create_company(db: Session, data: CompanyCreate) -> Company:
-    company = Company(
-        name=data.name,
-        industry=data.industry,
-        registration_number=data.registration_number,
-        country=data.country,
-    )
-    db.add(company)
-    try:
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        raise ConflictError(
-            f"A company with registration number '{data.registration_number}' already exists."
-        ) from exc
-    db.refresh(company)
-    return company
+from app.services.exceptions import NotFoundError
 
 
 def get_company(db: Session, company_id: uuid.UUID) -> Company:

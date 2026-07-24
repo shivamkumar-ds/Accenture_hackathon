@@ -1,16 +1,16 @@
-"""Pydantic schemas for Company — the request/response contract for the API layer."""
+"""
+Pydantic schemas for Company — the request/response contract for the API layer.
+
+CompanyCreate was removed as part of RC-1 audit finding A1 (POST /company
+removed — see app/api/v1/company.py's module docstring). Company creation
+now only happens atomically with its first Administrator, via
+RegisterRequest (app/schemas/auth.py) and auth_service.register().
+"""
 
 import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
-
-
-class CompanyCreate(BaseModel):
-    name: str
-    industry: str | None = None
-    registration_number: str
-    country: str | None = None
 
 
 class CompanyRead(BaseModel):
