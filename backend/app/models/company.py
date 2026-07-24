@@ -32,8 +32,10 @@ class Company(Base, UUIDPrimaryKeyMixin):
 class User(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "users"
 
+    # index=True: list_users() and every RBAC check filter by company_id
+    # (RC-1 audit finding B3) — unindexed until now.
     company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)

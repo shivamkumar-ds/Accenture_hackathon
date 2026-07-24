@@ -15,8 +15,10 @@ from app.models.mixins import UUIDPrimaryKeyMixin
 class Document(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "documents"
 
+    # index=True: every document list/lookup query filters by company_id
+    # (RC-1 audit finding B3) — unindexed until now.
     company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True
     )
 
     # Added in M2 — the frozen schema had no way to record who uploaded a

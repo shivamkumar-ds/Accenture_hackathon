@@ -16,7 +16,7 @@ class Recommendation(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "recommendations"
 
     mission_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False, index=True
     )
     recommendation_type: Mapped[RecommendationType] = mapped_column(
         Enum(RecommendationType, name="recommendation_type"), nullable=False
@@ -44,10 +44,10 @@ class ComplianceMatrix(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "compliance_matrix"
 
     recommendation_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("recommendations.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("recommendations.id"), nullable=False, index=True
     )
     requirement_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("requirements.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("requirements.id"), nullable=False, index=True
     )
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus, name="match_status"), nullable=False)
     supporting_evidence: Mapped[str | None] = mapped_column(Text, nullable=True)

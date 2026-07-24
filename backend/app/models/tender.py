@@ -16,7 +16,7 @@ class Tender(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "tenders"
 
     mission_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False, index=True
     )
     tender_name: Mapped[str | None] = mapped_column(String, nullable=True)
     organization: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -31,7 +31,7 @@ class Requirement(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "requirements"
 
     tender_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenders.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("tenders.id"), nullable=False, index=True
     )
     requirement_type: Mapped[RequirementType] = mapped_column(
         Enum(RequirementType, name="requirement_type"), nullable=False
@@ -46,7 +46,7 @@ class CapabilityMapping(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "capability_mappings"
 
     requirement_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("requirements.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("requirements.id"), nullable=False, index=True
     )
 
     # Polymorphic reference to one of the five capability entity tables —
@@ -56,7 +56,12 @@ class CapabilityMapping(Base, UUIDPrimaryKeyMixin):
     capability_entity_type: Mapped[CapabilityEntityType] = mapped_column(
         Enum(CapabilityEntityType, name="capability_entity_type"), nullable=False
     )
-    capability_entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    # index=True: revalidation_service.find_affected_missions() filters by
+    # (capability_entity_type, capability_entity_id) on every capability
+    # update/removal (RC-1 audit finding B3) — unindexed until now.
+    capability_entity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True
+    )
 
     match_status: Mapped[MatchStatus] = mapped_column(
         Enum(MatchStatus, name="match_status"), nullable=False

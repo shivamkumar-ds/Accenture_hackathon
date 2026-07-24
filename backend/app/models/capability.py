@@ -20,8 +20,10 @@ from app.models.mixins import CapabilityMetadataMixin, UUIDPrimaryKeyMixin
 class Certification(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
     __tablename__ = "certifications"
 
+    # index=True: every capability read/list/decision-matching query filters
+    # by company_id (RC-1 audit finding B3) — unindexed until now.
     company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True
     )
     certification_name: Mapped[str] = mapped_column(String, nullable=False)
     issuing_authority: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -37,8 +39,10 @@ class Certification(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
 class Employee(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
     __tablename__ = "employees"
 
+    # index=True: every capability read/list/decision-matching query filters
+    # by company_id (RC-1 audit finding B3) — unindexed until now.
     company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     position: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -54,8 +58,10 @@ class Employee(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
 class Project(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
     __tablename__ = "projects"
 
+    # index=True: every capability read/list/decision-matching query filters
+    # by company_id (RC-1 audit finding B3) — unindexed until now.
     company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True
     )
     client: Mapped[str | None] = mapped_column(String, nullable=True)
     industry: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -68,8 +74,10 @@ class Project(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
 class Equipment(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
     __tablename__ = "equipment"
 
+    # index=True: every capability read/list/decision-matching query filters
+    # by company_id (RC-1 audit finding B3) — unindexed until now.
     company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True
     )
     equipment_name: Mapped[str] = mapped_column(String, nullable=False)
     category: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -81,8 +89,10 @@ class Equipment(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
 class FinancialRecord(Base, UUIDPrimaryKeyMixin, CapabilityMetadataMixin):
     __tablename__ = "financial_records"
 
+    # index=True: every capability read/list/decision-matching query filters
+    # by company_id (RC-1 audit finding B3) — unindexed until now.
     company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True
     )
     financial_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     revenue: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)

@@ -15,8 +15,10 @@ from app.models.mixins import UUIDPrimaryKeyMixin
 class Mission(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "missions"
 
+    # index=True: every mission list/lookup query filters by company_id
+    # (RC-1 audit finding B3) — unindexed until now.
     company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
@@ -54,7 +56,7 @@ class CapabilitySnapshot(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "capability_snapshots"
 
     mission_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("missions.id"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
