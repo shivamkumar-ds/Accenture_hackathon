@@ -21,7 +21,6 @@ import {
 import {
   AlertTriangle,
   ArrowRight,
-  Bell,
   CheckCircle2,
   FileBarChart2,
   FileSearch,
@@ -95,35 +94,6 @@ export default function Dashboard() {
     [evaluations]
   );
 
-  // DESIGN_SYSTEM.md v1.0 §9: the dashboard should answer "what needs my
-  // attention today," not "look how many tenders exist." These are the two
-  // situations that genuinely require a human decision right now -- a
-  // mission waiting on approval, or a mandatory requirement that isn't met.
-  const attentionItems = useMemo(() => {
-    const items: { id: string; label: string; detail: string; to: string; tone: "warning" | "danger" }[] = [];
-
-    missions
-      .filter((m) => m.status === "awaiting_approval")
-      .forEach((m) =>
-        items.push({ id: `approval-${m.id}`, label: m.mission_type, detail: "Awaiting your approval", to: `/missions/${m.id}`, tone: "warning" })
-      );
-
-    evaluations.forEach(({ mission, evaluation }) => {
-      const unresolved = evaluation.gap_analysis.filter((g) => g.mandatory && g.status === "not_met").length;
-      if (unresolved > 0) {
-        items.push({
-          id: `gap-${mission.id}`,
-          label: mission.mission_type,
-          detail: `${unresolved} mandatory requirement${unresolved > 1 ? "s" : ""} not met`,
-          to: `/missions/${mission.id}`,
-          tone: "danger",
-        });
-      }
-    });
-
-    return items.slice(0, 5);
-  }, [missions, evaluations]);
-
   const runningMission = missions.find((m) => m.status === "running") ?? null;
 
   // "Recent Activity" -- merged from real timestamped events we already
@@ -184,57 +154,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{greeting} 👋</h1>
-          <p className="text-sm text-muted-foreground mt-1">Here's what's happening with your tenders today.</p>
-        </div>
-        {!loading && (
-          <a href="#attention" className="relative shrink-0">
-            <div className="w-9 h-9 rounded-lg border border-border bg-surface flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors">
-              <Bell size={16} />
-            </div>
-            {attentionItems.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-danger-foreground text-[10px] font-bold flex items-center justify-center">
-                {attentionItems.length}
-              </span>
-            )}
-          </a>
-        )}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">{greeting} 👋</h1>
+        <p className="text-sm text-muted-foreground mt-1">Here's what's happening with your tenders today.</p>
       </div>
-
-      {!loading && (
-        <Card id="attention" className={attentionItems.length > 0 ? "border-warning/30 scroll-mt-6" : "scroll-mt-6"}>
-          <CardHeader
-            title="Needs Your Attention"
-            description={attentionItems.length > 0 ? `${attentionItems.length} item(s) waiting on a decision` : "Nothing requires a decision right now"}
-          />
-          <CardBody className={attentionItems.length > 0 ? "!py-2" : undefined}>
-            {attentionItems.length > 0 ? (
-              <ul className="divide-y divide-border -mx-6">
-                {attentionItems.map((item) => (
-                  <li key={item.id}>
-                    <Link to={item.to} className="flex items-center justify-between gap-3 px-6 py-3 hover:bg-surface-hover transition-colors">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{item.label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>
-                      </div>
-                      <Badge value={item.tone === "danger" ? "not_met" : "review_required"} label={item.tone === "danger" ? "Blocked" : "Pending"} withIcon />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="flex items-center gap-3 py-2">
-                <div className="w-8 h-8 rounded-lg bg-success/10 text-success flex items-center justify-center shrink-0">
-                  <CheckCircle2 size={15} />
-                </div>
-                <p className="text-sm text-muted-foreground">No missions are awaiting approval and no mandatory requirements are unresolved.</p>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      )}
 
       {loading ? (
         <SkeletonStatRow />
