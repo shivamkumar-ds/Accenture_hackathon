@@ -264,7 +264,7 @@ export default function Dashboard() {
                         <th className="px-3 py-2.5 font-medium hidden sm:table-cell whitespace-nowrap">Uploaded On</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">Status</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">Evaluation Status</th>
-                        <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Actions</th>
+                        <th className="pl-3 pr-6 py-2.5 font-medium text-right whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -289,7 +289,7 @@ export default function Dashboard() {
                           <td className="px-3 py-3 whitespace-nowrap">
                             <Badge value={m.status} label={EVAL_STATUS_LABEL[m.status]} withIcon />
                           </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
+                          <td className="pl-3 pr-6 py-3 whitespace-nowrap">
                             {/* Menu's root is a block <div>, which text-align
                                 on the <td> can't shift -- that was the real
                                 misalignment: the header's "Actions" label

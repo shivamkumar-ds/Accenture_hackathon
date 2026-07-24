@@ -140,7 +140,7 @@ export default function Login() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14 grid lg:grid-cols-[1.1fr_1fr] gap-12 items-start">
           {/* Left: pitch + real dashboard preview */}
           <div className="hidden lg:block">
-            <h1 className="text-4xl font-bold tracking-tight text-foreground">
+            <h1 className="font-display text-4xl font-bold tracking-tight text-foreground">
               {mode === "login" ? "Welcome Back!" : "Get Started"}
             </h1>
             <p className="mt-2 text-base text-muted-foreground">
@@ -173,7 +173,7 @@ export default function Login() {
                 <Logo size={22} />
               </div>
 
-              <h2 className="text-2xl font-bold text-center tracking-tight text-foreground">
+              <h2 className="font-display text-2xl font-bold text-center tracking-tight text-foreground">
                 {mode === "login" ? "Login" : "Create your workspace"}
               </h2>
               <p className="text-sm text-muted-foreground text-center mt-1 mb-6">
