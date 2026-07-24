@@ -62,7 +62,7 @@ export function FeaturesMegaPanel() {
               key={card.title}
               className="rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-elevated"
             >
-              <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-3">
+              <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center mb-3", card.color.bg, card.color.text)}>
                 <card.icon size={17} />
               </div>
               <p className="text-sm font-semibold tracking-tight leading-snug">{card.title}</p>

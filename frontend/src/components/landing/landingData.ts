@@ -9,7 +9,6 @@ import {
   Sparkles,
   Lock,
   Building2,
-  ShieldAlert,
   HardHat,
   Factory,
   Landmark,
@@ -100,14 +99,20 @@ export type FeatureCategory =
 
 export interface FeatureCard extends DropdownCard {
   category: FeatureCategory;
+  // Per-card icon accent -- this panel intentionally breaks from the
+  // single-accent-color rule elsewhere on the site (founder-directed,
+  // matching the approved reference layout) so eight distinct
+  // capabilities read as visually distinct at a glance.
+  color: { bg: string; text: string };
 }
 
 export const features: FeatureCard[] = [
   {
-    icon: FileSearch,
-    title: "AI Requirement Extraction",
-    description: "Reads real tender PDFs and pulls out every requirement, page-attributed.",
+    icon: FileText,
+    title: "AI Document Analysis",
+    description: "Extracts every requirement, clause, and condition from tender documents with context understanding.",
     category: "Document Intelligence",
+    color: { bg: "bg-blue-50", text: "text-blue-600" },
     details: [
       "Handles both text-based and scanned (OCR) tender documents",
       "Preserves the source page for every extracted requirement",
@@ -115,80 +120,87 @@ export const features: FeatureCard[] = [
     ],
   },
   {
-    icon: Lock,
-    title: "Secure Document Storage",
-    description: "Tender documents and company records are stored with access scoped to your organization.",
-    category: "Document Intelligence",
-    details: [
-      "Every document request is scoped to the authenticated company",
-      "Uploads are validated before processing",
-      "No document is ever visible across organizational boundaries",
-    ],
-  },
-  {
     icon: Layers,
-    title: "Capability Matching",
-    description: "Matches tender requirements against your certifications, staff, projects, equipment and financials.",
-    category: "Capability Management",
+    title: "Requirement Extraction",
+    description: "Automatically identifies technical, financial, legal, and commercial requirements with clause-level accuracy.",
+    category: "Document Intelligence",
+    color: { bg: "bg-emerald-50", text: "text-emerald-600" },
     details: [
-      "Covers five capability record types out of the box",
-      "Flags partial or conditional matches, not just yes/no",
-      "Surfaces the exact record used as evidence for each match",
-    ],
-  },
-  {
-    icon: Building2,
-    title: "Multi-company Workspace",
-    description: "Built as a multi-tenant platform from the ground up, not retrofitted.",
-    category: "Capability Management",
-    details: [
-      "Strict tenant isolation across documents, tenders, missions and evaluations",
-      "Each organization sees only its own capability library and history",
-      "Covered by an automated regression suite that protects this guarantee",
+      "Structures raw tender text into distinct requirement categories",
+      "Flags mandatory eligibility criteria separately from scope details",
+      "Every requirement stays linked back to its exact source clause",
     ],
   },
   {
     icon: ShieldCheck,
-    title: "Evidence-backed Decisions",
-    description: "Every recommendation links directly to the document and clause behind it.",
+    title: "Compliance Matrix",
+    description: "Maps requirements against your capabilities and shows compliance status with evidence references.",
     category: "Decision Intelligence",
+    color: { bg: "bg-violet-50", text: "text-violet-600" },
     details: [
-      "No verdict without a traceable source",
-      "A full evidence trail from recommendation back to the original document",
-      "Built for audit and internal review, not just a black-box score",
+      "Requirement-by-requirement compliance status, not just a summary score",
+      "Every status links to the capability record used as evidence",
+      "Flags partial or conditional matches, not just yes/no",
     ],
   },
   {
-    icon: Sparkles,
-    title: "Explainable AI",
-    description: "Every AI judgment comes with the reasoning behind it, in plain language.",
+    icon: Gauge,
+    title: "GO / NO-GO Recommendation",
+    description: "AI-powered decision engine provides a clear GO / NO-GO with confidence score and risk assessment.",
     category: "Decision Intelligence",
+    color: { bg: "bg-orange-50", text: "text-orange-600" },
     details: [
-      "No opaque scores -- every status is paired with a written reason",
-      "Confidence is broken down by document, entity, and matching stage",
-      "Designed to be reviewed and challenged by a human, not just trusted blindly",
+      "A single executive recommendation backed by the full compliance matrix",
+      "Confidence score broken down by document, entity, and matching stage",
+      "Every verdict is paired with a written reason, not a black-box score",
+    ],
+  },
+  {
+    icon: Building2,
+    title: "Capability Library",
+    description: "Build and manage your company capabilities including certifications, projects, personnel & equipment.",
+    category: "Capability Management",
+    color: { bg: "bg-teal-50", text: "text-teal-600" },
+    details: [
+      "Covers five capability record types out of the box",
+      "Reusable across every tender evaluation, not a one-time upload",
+      "Freshness tracking so stale certifications get flagged automatically",
+    ],
+  },
+  {
+    icon: FileSearch,
+    title: "Gap Analysis",
+    description: "Identifies missing documents, certifications, and capabilities that may affect your eligibility or score.",
+    category: "Capability Management",
+    color: { bg: "bg-rose-50", text: "text-rose-600" },
+    details: [
+      "Surfaces every unmet or at-risk requirement in one place",
+      "Distinguishes missing evidence from genuinely unmet criteria",
+      "Gives the bid team a concrete list to act on before submission",
+    ],
+  },
+  {
+    icon: Lock,
+    title: "Evidence Management",
+    description: "Attach and manage supporting documents with clause-level mapping and validity tracking.",
+    category: "Collaboration & Reports",
+    color: { bg: "bg-sky-50", text: "text-sky-600" },
+    details: [
+      "Every document request is scoped to the authenticated company",
+      "No verdict without a traceable source document",
+      "No document is ever visible across organizational boundaries",
     ],
   },
   {
     icon: FileBarChart2,
-    title: "Executive Reports",
-    description: "A decision-ready report your leadership can act on in minutes, not hours.",
+    title: "Reports & Dashboards",
+    description: "Generate executive-ready reports and track performance across tenders and teams.",
     category: "Collaboration & Reports",
+    color: { bg: "bg-purple-50", text: "text-purple-600" },
     details: [
       "Executive summary, confidence breakdown, and full compliance matrix",
-      "Exportable as a shareable PDF",
+      "One-click PDF export for offline circulation",
       "Written for a non-technical reader, not just the bid team",
-    ],
-  },
-  {
-    icon: ShieldAlert,
-    title: "Enterprise Security",
-    description: "Rate limiting, authenticated access, and encrypted transport by default.",
-    category: "Collaboration & Reports",
-    details: [
-      "Rate limiting on every AI-cost-incurring and authentication endpoint",
-      "Token-based authentication on every protected route",
-      "Encrypted transport (TLS) for all traffic",
     ],
   },
 ];
