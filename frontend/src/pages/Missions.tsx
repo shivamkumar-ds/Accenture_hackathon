@@ -234,7 +234,16 @@ export default function Missions() {
       ) : missions.length === 0 ? (
         <Card>
           <CardBody>
-            <EmptyState icon={Radar} title="No missions yet" description="Upload a tender to start your first mission." />
+            <EmptyState
+              icon={Radar}
+              title="No missions yet"
+              description="Upload a tender to start your first mission."
+              action={
+                <Link to="/tenders/new" className="text-sm font-medium text-primary hover:underline">
+                  Upload a tender →
+                </Link>
+              }
+            />
           </CardBody>
         </Card>
       ) : visibleMissions.length === 0 ? (

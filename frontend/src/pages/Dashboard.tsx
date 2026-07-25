@@ -372,6 +372,11 @@ export default function Dashboard() {
                   icon={Loader2}
                   title="Nothing running right now"
                   description="Run a full analysis from Tender Workspace to see live status here."
+                  action={
+                    <Link to="/missions" className="text-sm font-medium text-primary hover:underline">
+                      Go to Tender Workspace →
+                    </Link>
+                  }
                 />
               )}
             </CardBody>

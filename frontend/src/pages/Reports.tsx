@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { getCompany, getEvaluation, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
@@ -127,6 +128,11 @@ export default function Reports() {
                   icon={FileBarChart2}
                   title="No reports yet"
                   description="Run the Decision Engine on a tender in Tender Workspace to generate its first report."
+                  action={
+                    <Link to="/missions" className="text-sm font-medium text-primary hover:underline">
+                      Go to Tender Workspace →
+                    </Link>
+                  }
                 />
               </div>
             ) : (

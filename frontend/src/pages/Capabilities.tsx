@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { buildCapability, deleteCapability, getCapabilityGraph, listDocuments } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
@@ -145,7 +146,16 @@ export default function Capabilities() {
           {loading ? (
             <SkeletonList rows={2} />
           ) : documents.length === 0 ? (
-            <EmptyState icon={Layers} title="No documents yet" description="Upload a document on the Documents page first." />
+            <EmptyState
+              icon={Layers}
+              title="No documents yet"
+              description="Upload a document on the Documents page first."
+              action={
+                <Link to="/documents" className="text-sm font-medium text-primary hover:underline">
+                  Go to Documents →
+                </Link>
+              }
+            />
           ) : building ? (
             <AIProcessing stages={BUILD_STAGES} />
           ) : (
