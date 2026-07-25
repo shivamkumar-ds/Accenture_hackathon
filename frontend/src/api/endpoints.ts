@@ -7,6 +7,7 @@ import type {
   LoginRequest,
   MissionRead,
   RegisterRequest,
+  TenderMetadataGuess,
   TenderUploadResponse,
   TenderWithRequirements,
   TokenResponse,
@@ -79,6 +80,18 @@ export const uploadTender = (
   if (fields.closing_date) form.append("closing_date", fields.closing_date);
   return apiClient
     .post<TenderUploadResponse>("/api/v1/tenders/upload", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    .then((r) => r.data);
+};
+
+// Best-effort, heuristic-only prefill read of a just-selected PDF -- never
+// persisted server-side. Any/all fields can come back null.
+export const extractTenderMetadata = (file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+  return apiClient
+    .post<TenderMetadataGuess>("/api/v1/tenders/extract-metadata", form, {
       headers: { "Content-Type": "multipart/form-data" },
     })
     .then((r) => r.data);

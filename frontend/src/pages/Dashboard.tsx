@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { executeMission, getCapabilityGraph, getEvaluation, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
-import { useAuth } from "../context/AuthContext";
 import { tenderDisplayName } from "../lib/tenderName";
 import type { CapabilityGraphResponse, EvaluationResponse, MissionRead, MissionStatus } from "../api/types";
 import {
@@ -46,9 +45,11 @@ const EVAL_STATUS_LABEL: Record<MissionStatus, string> = {
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const { notify } = useToast();
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const greeting = useGreeting(user?.name);
+  // Name dropped from the greeting deliberately (polish pass) -- "Good
+  // afternoon 👋" only, subtitle unchanged. useGreeting still supports a
+  // name arg for any future caller that wants it.
+  const greeting = useGreeting();
   const [missions, setMissions] = useState<MissionRead[]>([]);
   const [evaluations, setEvaluations] = useState<{ mission: MissionRead; evaluation: EvaluationResponse }[]>([]);
   const [capabilities, setCapabilities] = useState<CapabilityGraphResponse | null>(null);

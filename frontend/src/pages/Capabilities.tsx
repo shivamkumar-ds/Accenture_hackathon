@@ -53,6 +53,28 @@ export default function Capabilities() {
     return new Set(allEntities.filter((e) => e.source_document_id).map((e) => e.source_document_id as string));
   }, [graph]);
 
+  // Real preview text per document -- one document produces exactly one
+  // capability entity (the "one document, one-time" rule above), so this
+  // isn't pulling multiple separate records; it's the entity's own real
+  // multi-value fields (an employee's skills, a project's similarity
+  // tags) plus its name/label, so a document with only a single-value
+  // entity (certification/equipment/financial record) honestly shows
+  // just the one line rather than inventing extra items.
+  const previewsByDocument = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (!graph) return map;
+    const add = (docId: string | null, items: (string | null | undefined)[]) => {
+      if (!docId) return;
+      map.set(docId, items.filter((v): v is string => Boolean(v && v.trim())));
+    };
+    graph.certifications.forEach((c) => add(c.source_document_id, [c.certification_name, c.issuing_authority]));
+    graph.employees.forEach((e) => add(e.source_document_id, [e.name, ...(e.skills ?? [])]));
+    graph.projects.forEach((p) => add(p.source_document_id, [p.client ?? "Unnamed client", ...(p.similarity_tags ?? [])]));
+    graph.equipment.forEach((eq) => add(eq.source_document_id, [eq.equipment_name]));
+    graph.financial_records.forEach((f) => add(f.source_document_id, [f.financial_year ? `FY ${f.financial_year}` : null]));
+    return map;
+  }, [graph]);
+
   const refresh = async () => {
     setLoading(true);
     try {
@@ -135,12 +157,27 @@ export default function Capabilities() {
                 // Deleting the entity below (Certifications/Employees/etc.
                 // section) frees the document up to be rebuilt.
                 const alreadyBuilt = builtDocumentIds.has(d.id);
+                const preview = previewsByDocument.get(d.id) ?? [];
+                const shown = preview.slice(0, 4);
+                const extra = preview.length - shown.length;
                 return (
-                  <li key={d.id} className="px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-sm font-medium truncate min-w-0">{d.file_name}</span>
+                  <li key={d.id} className="px-6 py-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium truncate block">{d.file_name}</span>
+                      {alreadyBuilt && shown.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5">
+                          {shown.map((item, i) => (
+                            <li key={i} className="text-xs text-muted-foreground truncate">
+                              • {item}
+                            </li>
+                          ))}
+                          {extra > 0 && <li className="text-xs text-muted-foreground/70">+{extra} more</li>}
+                        </ul>
+                      )}
+                    </div>
                     {alreadyBuilt ? (
                       <span className="text-xs text-muted-foreground shrink-0">
-                        Capabilities already built — delete the entry below to rebuild
+                        Capabilities built — delete below to rebuild
                       </span>
                     ) : (
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">

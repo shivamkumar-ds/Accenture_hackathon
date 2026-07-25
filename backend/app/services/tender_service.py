@@ -11,13 +11,15 @@ Company scoping goes through Tender -> Mission -> company_id, since
 Tender has no company_id column of its own.
 """
 
+import tempfile
 import uuid
 from datetime import date
+from pathlib import Path
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
-from app.agents import tender_analyzer
+from app.agents import document_parser, tender_analyzer, tender_metadata_guess
 from app.core import storage
 from app.models import Document, Mission, Requirement, Tender
 from app.models.enums import DocumentProcessingStatus, MissionStatus, RequirementType
@@ -58,6 +60,26 @@ async def upload_tender(
     db.refresh(mission)
     db.refresh(tender)
     return mission, tender
+
+
+async def extract_tender_metadata(file: UploadFile) -> dict:
+    """Best-effort, heuristic-only (no LLM call) read of a just-selected PDF's
+    first couple of pages, purely to prefill the New Tender upload form before
+    the user commits. Nothing here is persisted -- the file is read into a
+    temp path, parsed, and discarded. Any/all fields can legitimately come
+    back None."""
+    suffix = Path(file.filename).suffix if file.filename else ".pdf"
+    contents = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(contents)
+        tmp.flush()
+        try:
+            pages = document_parser.extract_pdf_pages(Path(tmp.name))
+        except Exception as exc:
+            raise ExtractionError(f"Could not read PDF: {exc}") from exc
+    await file.seek(0)
+    text = "\n".join(pages[:2])
+    return tender_metadata_guess.guess_metadata(text)
 
 
 def get_tender(db: Session, tender_id: uuid.UUID, company_id: uuid.UUID) -> Tender:

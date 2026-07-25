@@ -24,7 +24,7 @@ const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/documents", label: "Documents", icon: FileStack },
   { to: "/capabilities", label: "Capabilities", icon: Layers },
-  { to: "/tenders/new", label: "New Tender", icon: FileUp },
+  { to: "/tenders/new", label: "Upload Tender", icon: FileUp },
   { to: "/missions", label: "Tender Workspace", icon: Radar },
   { to: "/reports", label: "Reports", icon: FileBarChart2 },
 ];

@@ -114,6 +114,9 @@ export interface ProjectEntry extends CapabilityCommon {
   contract_value: number | null;
   duration: string | null;
   completion_status: string | null;
+  // Was already returned by the backend (ProjectRead.similarity_tags) but
+  // missing from this type -- pre-existing drift, not a new field.
+  similarity_tags: string[] | null;
 }
 
 export interface EquipmentEntry extends CapabilityCommon {
@@ -161,6 +164,15 @@ export interface TenderRead {
 export interface TenderWithRequirements {
   tender: TenderRead;
   requirements: RequirementRead[];
+}
+
+// Response for POST /tenders/extract-metadata -- heuristic-only (regex, no
+// LLM call) best-effort read of a just-selected PDF, purely to prefill the
+// New Tender form. Never persisted; any/all fields can come back null.
+export interface TenderMetadataGuess {
+  tender_name: string | null;
+  organization: string | null;
+  closing_date: string | null;
 }
 
 // The upload-tender endpoint's response is loosely typed in the OpenAPI spec

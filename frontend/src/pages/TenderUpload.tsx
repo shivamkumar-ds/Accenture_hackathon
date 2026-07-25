@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { uploadTender } from "../api/endpoints";
+import { extractTenderMetadata, uploadTender } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import { Button, Card, CardBody, CardHeader, Dropzone, Input } from "../components/kit";
@@ -11,8 +11,28 @@ export default function TenderUpload() {
   const [organization, setOrganization] = useState("");
   const [closingDate, setClosingDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const { notify } = useToast();
   const navigate = useNavigate();
+
+  // Best-effort prefill from the PDF's own text -- heuristic-only, never
+  // overwrites anything the user already typed, and silently no-ops on
+  // failure (this is a convenience, not a required step).
+  const handleFileSelected = (selected: File | null) => {
+    setFile(selected);
+    if (!selected) return;
+    setExtracting(true);
+    extractTenderMetadata(selected)
+      .then((guess) => {
+        setTenderName((prev) => prev || guess.tender_name || "");
+        setOrganization((prev) => prev || guess.organization || "");
+        setClosingDate((prev) => prev || guess.closing_date || "");
+      })
+      .catch(() => {
+        // Non-fatal: form stays blank/editable, upload flow is unaffected.
+      })
+      .finally(() => setExtracting(false));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +70,18 @@ export default function TenderUpload() {
         <CardBody>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="space-y-4">
-              <Input label="Tender Name (optional)" value={tenderName} onChange={(e) => setTenderName(e.target.value)} />
-              <Input label="Organization (optional)" value={organization} onChange={(e) => setOrganization(e.target.value)} />
+              <Input
+                label="Tender Name (optional)"
+                value={tenderName}
+                onChange={(e) => setTenderName(e.target.value)}
+                placeholder={extracting ? "Reading PDF…" : undefined}
+              />
+              <Input
+                label="Organization (optional)"
+                value={organization}
+                onChange={(e) => setOrganization(e.target.value)}
+                placeholder={extracting ? "Reading PDF…" : undefined}
+              />
               <Input
                 label="Closing Date (optional)"
                 type="date"
@@ -63,7 +93,7 @@ export default function TenderUpload() {
               </Button>
             </div>
             <div>
-              <Dropzone file={file} onFileSelected={setFile} hint="Tender PDF, up to 50MB" className="h-full min-h-[280px]" />
+              <Dropzone file={file} onFileSelected={handleFileSelected} hint="Tender PDF, up to 50MB" className="h-full min-h-[280px]" />
             </div>
           </form>
         </CardBody>

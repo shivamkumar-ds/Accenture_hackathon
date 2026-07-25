@@ -20,6 +20,7 @@ from app.core.rate_limit import limiter
 from app.models import User
 from app.schemas.tender import (
     RequirementRead,
+    TenderMetadataGuess,
     TenderRead,
     TenderUploadResult,
     TenderWithRequirements,
@@ -64,6 +65,24 @@ async def upload_tender(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
         ) from exc
     return TenderUploadResult(tender_id=tender.id, mission_id=mission.id)
+
+
+# 20/minute per IP -- same budget as /tenders/upload since it does the same
+# PDF-read work, just without persisting anything.
+@tenders_router.post("/extract-metadata", response_model=TenderMetadataGuess)
+@limiter.limit("20/minute")
+async def extract_metadata(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+) -> TenderMetadataGuess:
+    try:
+        guess = await tender_service.extract_tender_metadata(file)
+    except ExtractionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return TenderMetadataGuess(**guess)
 
 
 @tenders_router.get("/{tender_id}", response_model=TenderWithRequirements)

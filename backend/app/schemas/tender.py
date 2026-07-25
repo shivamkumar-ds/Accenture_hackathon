@@ -51,3 +51,15 @@ class TenderUploadResult(BaseModel):
 
     tender_id: uuid.UUID
     mission_id: uuid.UUID
+
+
+class TenderMetadataGuess(BaseModel):
+    """Response for POST /tenders/extract-metadata -- a best-effort,
+    heuristic-only (regex, no LLM call) read of a just-selected PDF's
+    first couple of pages, purely to prefill the New Tender form before
+    the user commits to an upload. Never persisted; any/all fields can
+    come back None if nothing recognizable was found."""
+
+    tender_name: str | None
+    organization: str | None
+    closing_date: date | None
