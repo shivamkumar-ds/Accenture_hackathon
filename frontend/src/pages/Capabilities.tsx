@@ -33,7 +33,14 @@ export default function Capabilities() {
     setLoading(true);
     try {
       const [docs, capGraph] = await Promise.all([listDocuments(), getCapabilityGraph()]);
-      setDocuments(docs);
+      // Capability Library only builds from company documents (certifications,
+      // resumes, project/equipment/financial records) -- tender documents go
+      // through a separate upload flow (document_type "tender", set only by
+      // TenderUpload.tsx/tender_service.upload_tender) and were never meant
+      // to be extractable as capability evidence. listDocuments() returns
+      // every company document with no type filter, so this page has to
+      // exclude tenders itself.
+      setDocuments(docs.filter((d) => d.document_type !== "tender"));
       setGraph(capGraph);
     } catch (err) {
       notify("error", extractErrorMessage(err));
