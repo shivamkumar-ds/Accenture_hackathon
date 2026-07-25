@@ -90,7 +90,10 @@ export function StatCard({
         </div>
       </div>
       {linkTo && (
-        <Link to={linkTo} className="text-[11px] font-medium text-primary hover:underline mt-auto pt-2.5 leading-snug">
+        <Link
+          to={linkTo}
+          className="text-[11px] font-medium text-primary hover:underline mt-auto pt-2.5 leading-snug text-right"
+        >
           {linkLabel ?? "View all"} <span aria-hidden="true">→</span>
         </Link>
       )}
