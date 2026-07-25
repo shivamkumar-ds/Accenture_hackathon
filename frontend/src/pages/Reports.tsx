@@ -208,6 +208,36 @@ export default function Reports() {
                     <ConfidenceBar label="Matching Confidence" value={evaluation.recommendation.matching_confidence} />
                     <ConfidenceBar label="Recommendation Confidence" value={evaluation.recommendation.recommendation_confidence} />
                   </div>
+
+                  {/* Quick-glance rollup of the same merged compliance data the
+                      Compliance Summary card below breaks out in full --
+                      "Needs Review" combines review_required + conditional,
+                      "Missing" is not_met, matching the Decision Screen's own
+                      status vocabulary rather than inventing new labels. */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border">
+                    <div>
+                      <p className="text-xl font-semibold tabular-nums">{merged.length}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Requirements Reviewed</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-semibold tabular-nums text-success">
+                        {merged.filter((m) => m.status === "met").length}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Matched</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-semibold tabular-nums text-warning">
+                        {merged.filter((m) => m.status === "review_required" || m.status === "conditional").length}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Needs Review</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-semibold tabular-nums text-danger">
+                        {merged.filter((m) => m.status === "not_met").length}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Missing</p>
+                    </div>
+                  </div>
                 </CardBody>
               </Card>
 
