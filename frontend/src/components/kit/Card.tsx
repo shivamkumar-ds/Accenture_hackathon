@@ -76,19 +76,17 @@ export function StatCard({
       )}
       <div className="min-w-0 flex-1 flex flex-col">
         <p className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</p>
-        <p className="text-lg font-bold tracking-tight tabular-nums mt-0.5 truncate">{value}</p>
-        {/* truncate (not wrap) on trend/link -- these are meant to be one
-            uniform line per card, same as the reference; letting them wrap
-            was what made card rows uneven ("view all evaluations" arrow
-            dropping to its own line while the shorter labels stayed put). */}
-        {trend && <p className="text-[11px] text-muted-foreground mt-1 truncate">{trend}</p>}
+        <p className="text-lg font-bold tracking-tight tabular-nums mt-0.5">{value}</p>
+        {/* Plain text wrapping (not flex+truncate) -- the arrow is a
+            regular character in the same text flow as the label, so on a
+            narrow card the whole line just reflows to a second line like
+            normal text instead of either getting cut off or having the
+            arrow orphaned on its own line (the flex-layout version's
+            problem). */}
+        {trend && <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{trend}</p>}
         {linkTo && (
-          <Link
-            to={linkTo}
-            className="text-[11px] font-medium text-primary hover:underline mt-1.5 flex items-center gap-1 min-w-0"
-          >
-            <span className="truncate">{linkLabel ?? "View all"}</span>
-            <span aria-hidden="true" className="shrink-0">→</span>
+          <Link to={linkTo} className="text-[11px] font-medium text-primary hover:underline mt-1.5 leading-snug">
+            {linkLabel ?? "View all"} <span aria-hidden="true">→</span>
           </Link>
         )}
       </div>
