@@ -41,7 +41,14 @@ export default function Documents() {
   const refresh = async () => {
     setLoading(true);
     try {
-      setDocuments(await listDocuments());
+      // This page is "Company Documents" specifically (see the header copy
+      // below) -- tender documents (document_type "tender", uploaded via
+      // the separate New Tender flow) aren't company capability evidence
+      // and shouldn't appear here, same reasoning as the Capability
+      // Library's own document list. listDocuments() has no type filter,
+      // so it's applied client-side.
+      const docs = await listDocuments();
+      setDocuments(docs.filter((d) => d.document_type !== "tender"));
       setLastSynced(new Date());
     } catch (err) {
       notify("error", extractErrorMessage(err));
