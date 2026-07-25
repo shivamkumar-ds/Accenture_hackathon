@@ -4,10 +4,10 @@ import { archiveMission, executeMission, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Select, SkeletonList } from "../components/kit";
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Input, Select, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
 import { tenderDisplayName } from "../lib/tenderName";
-import { ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, Radar, Trash2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, Radar, Search, Sparkles, Trash2 } from "lucide-react";
 
 // The brief asked for a visual "story" of the tender journey (Upload ->
 // Extraction -> Matching -> Compliance -> Gap Analysis -> Decision Engine
@@ -67,6 +67,33 @@ function MissionStepper({ status }: { status: MissionStatus }) {
   );
 }
 
+// Honest rotating status line for a mission currently mid-execute -- same
+// posture as the kit AIProcessing component (real LLM call, no fake
+// progress %), just compact enough to sit under the stepper on a list card
+// instead of taking over the whole page.
+const RUNNING_MESSAGES = [
+  "Running AI analysis…",
+  "Reading tender requirements…",
+  "Matching against your capabilities…",
+  "Still working — this can take a little while…",
+];
+
+function RunningIndicator() {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((i) => (i < RUNNING_MESSAGES.length - 1 ? i + 1 : i));
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <div className="mt-4 pt-4 border-t border-border flex items-center gap-2 text-xs text-muted-foreground">
+      <Sparkles size={13} className="text-primary animate-pulse shrink-0" />
+      <span>{RUNNING_MESSAGES[index]}</span>
+    </div>
+  );
+}
+
 export default function Missions() {
   const [missions, setMissions] = useState<MissionRead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +104,9 @@ export default function Missions() {
   // rather than listing choices that would fail.
   const [provider, setProvider] = useState<"openai">("openai");
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<MissionStatus | "all">("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
   const { notify } = useToast();
   const navigate = useNavigate();
 
@@ -105,6 +135,22 @@ export default function Missions() {
   // user should read 1, 2, 3... in the order tenders were actually uploaded,
   // so it's derived here rather than relying on array position directly.
   const total = missions.length;
+  // Order numbers reflect real upload order (index in the newest-first
+  // fetch), independent of the current filter/sort applied for display.
+  const orderById = new Map(missions.map((m, i) => [m.id, total - i]));
+
+  // Search + status filter + sort are purely client-side over the already-
+  // fetched, already-archived-filtered list -- no new backend query params
+  // needed since list_missions() already returns everything this page uses.
+  const visibleMissions = missions
+    .filter((m) => statusFilter === "all" || m.status === statusFilter)
+    .filter((m) => tenderDisplayName(m).toLowerCase().includes(search.trim().toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      if (sortBy === "name") return tenderDisplayName(a).localeCompare(tenderDisplayName(b));
+      const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return sortBy === "oldest" ? diff : -diff;
+    });
 
   const handleRunFullAnalysis = async (missionId: string) => {
     setRunningId(missionId);
@@ -142,6 +188,43 @@ export default function Missions() {
         </p>
       </div>
 
+      {!loading && missions.length > 0 && (
+        <Card>
+          <CardBody className="flex flex-wrap items-center gap-3 py-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search tenders…"
+                className="pl-8"
+                aria-label="Search tenders"
+              />
+            </div>
+            <div className="w-44">
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as MissionStatus | "all")}
+                aria-label="Filter by status"
+              >
+                <option value="all">All statuses</option>
+                <option value="created">Uploaded</option>
+                <option value="running">AI Processing</option>
+                <option value="awaiting_approval">Awaiting Approval</option>
+                <option value="completed">Completed</option>
+              </Select>
+            </div>
+            <div className="w-44">
+              <Select value={sortBy} onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "name")} aria-label="Sort by">
+                <option value="newest">Sort: Newest first</option>
+                <option value="oldest">Sort: Oldest first</option>
+                <option value="name">Sort: Name (A-Z)</option>
+              </Select>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       {loading ? (
         <Card>
           <CardBody>
@@ -154,10 +237,20 @@ export default function Missions() {
             <EmptyState icon={Radar} title="No missions yet" description="Upload a tender to start your first mission." />
           </CardBody>
         </Card>
+      ) : visibleMissions.length === 0 ? (
+        <Card>
+          <CardBody>
+            <EmptyState
+              icon={Search}
+              title="No tenders match"
+              description="Try a different search term or status filter."
+            />
+          </CardBody>
+        </Card>
       ) : (
         <div className="space-y-4">
-          {missions.map((m, i) => {
-            const order = total - i; // upload order: 1 = first tender ever uploaded
+          {visibleMissions.map((m) => {
+            const order = orderById.get(m.id) ?? 0;
             return (
               <Card key={m.id} className="transition-shadow hover:shadow-elevated">
                 <CardBody>
@@ -195,6 +288,7 @@ export default function Missions() {
                   <div className="overflow-x-auto pb-1">
                     <MissionStepper status={m.status} />
                   </div>
+                  {m.status === "running" && <RunningIndicator />}
                   {m.status === "created" && (
                     <div className="mt-5 pt-4 border-t border-border flex items-center justify-end gap-2.5">
                       <span className="text-xs text-muted-foreground">AI Engine</span>
