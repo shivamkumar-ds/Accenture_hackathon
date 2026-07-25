@@ -18,7 +18,7 @@ from app.core import storage
 from app.models import Certification, Employee, Equipment, FinancialRecord, Project
 from app.models.enums import CapabilityEntityType, DocumentProcessingStatus, VerificationStatus
 from app.services.document_service import get_document
-from app.services.exceptions import ExtractionError
+from app.services.exceptions import ConflictError, ExtractionError
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,27 @@ ALL_CAPABILITY_MODELS = {
 DATE_FIELDS = {"issue_date", "expiry_date"}
 
 
+def document_has_active_capabilities(db: Session, document_id: uuid.UUID) -> bool:
+    """
+    True if any of the 5 capability entity tables has a live (not
+    soft-removed) row whose source_document_id is this document —
+    regardless of which entity_type it was built as. One document
+    produces one capability record; a second build attempt without
+    deleting the first would just create a duplicate, so this is the
+    "one document, one-time capability" guard build_capability_from_document
+    checks before running (real) extraction.
+    """
+    for model_cls in ALL_CAPABILITY_MODELS.values():
+        exists = (
+            db.query(model_cls.id)
+            .filter(model_cls.source_document_id == document_id, model_cls.removed_at.is_(None))
+            .first()
+        )
+        if exists is not None:
+            return True
+    return False
+
+
 async def build_capability_from_document(
     db: Session,
     document_id: uuid.UUID,
@@ -56,6 +77,12 @@ async def build_capability_from_document(
     # belong to this company — propagates as-is, the router already
     # knows how to map it to a 404.
     document = get_document(db, document_id, company_id)
+
+    if document_has_active_capabilities(db, document_id):
+        raise ConflictError(
+            f"Document '{document_id}' already has capabilities built from it. "
+            "Delete the existing capability entry first to rebuild."
+        )
 
     document.processing_status = DocumentProcessingStatus.PROCESSING
     db.commit()

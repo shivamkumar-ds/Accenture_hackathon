@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { buildCapability, getCapabilityGraph, listDocuments } from "../api/endpoints";
+import { useEffect, useMemo, useState } from "react";
+import { buildCapability, deleteCapability, getCapabilityGraph, listDocuments } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
 import type { CapabilityEntityType, CapabilityGraphResponse, DocumentRead } from "../api/types";
 import {
   Badge,
@@ -15,7 +16,7 @@ import {
   StatCard,
 } from "../components/kit";
 import { AIProcessing } from "../components/kit";
-import { Award, Users, Briefcase, Wrench, Landmark, Layers, type LucideIcon } from "lucide-react";
+import { Award, Users, Briefcase, Wrench, Landmark, Layers, Trash2, type LucideIcon } from "lucide-react";
 
 const ENTITY_TYPES: CapabilityEntityType[] = ["certification", "employee", "project", "equipment", "financial_record"];
 
@@ -26,8 +27,31 @@ export default function Capabilities() {
   const [graph, setGraph] = useState<CapabilityGraphResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [building, setBuilding] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<Record<string, CapabilityEntityType>>({});
   const { notify } = useToast();
+  const { user } = useAuth();
+  // DELETE /capabilities/{id} is admin-only server-side (require_administrator)
+  // -- hiding the button for non-admins avoids a confusing 403 on click,
+  // it's not a real access-control boundary (the backend still enforces it).
+  const canDeleteCapabilities = user?.role === "administrator";
+
+  // One document, one-time capability: a document that already has a live
+  // (non-removed) capability entity built from it, regardless of type,
+  // can't be built again until that entity is deleted (backend enforces
+  // this with a 409; this Set drives the matching UI state so the Build
+  // button doesn't even offer an action that will just fail).
+  const builtDocumentIds = useMemo(() => {
+    if (!graph) return new Set<string>();
+    const allEntities = [
+      ...graph.certifications,
+      ...graph.employees,
+      ...graph.projects,
+      ...graph.equipment,
+      ...graph.financial_records,
+    ];
+    return new Set(allEntities.filter((e) => e.source_document_id).map((e) => e.source_document_id as string));
+  }, [graph]);
 
   const refresh = async () => {
     setLoading(true);
@@ -68,6 +92,22 @@ export default function Capabilities() {
     }
   };
 
+  const handleRemoveCapability = async (entityId: string, label: string) => {
+    if (!confirm(`Delete "${label}" from the capability library? Any mission currently citing it as evidence will be re-evaluated.`)) {
+      return;
+    }
+    setRemovingId(entityId);
+    try {
+      await deleteCapability(entityId);
+      notify("success", `"${label}" removed.`);
+      await refresh();
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -88,29 +128,43 @@ export default function Capabilities() {
             <AIProcessing stages={BUILD_STAGES} />
           ) : (
             <ul className="divide-y divide-border -mx-6">
-              {documents.map((d) => (
-                <li key={d.id} className="px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-sm font-medium truncate min-w-0">{d.file_name}</span>
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <Select
-                      value={selectedType[d.id] ?? ENTITY_TYPES[0]}
-                      onChange={(e) =>
-                        setSelectedType((prev) => ({ ...prev, [d.id]: e.target.value as CapabilityEntityType }))
-                      }
-                      className="!py-1.5 text-xs"
-                    >
-                      {ENTITY_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t.replace(/_/g, " ")}
-                        </option>
-                      ))}
-                    </Select>
-                    <Button size="sm" onClick={() => handleBuild(d.id, d.file_name)}>
-                      Build Capabilities
-                    </Button>
-                  </div>
-                </li>
-              ))}
+              {documents.map((d) => {
+                // One document, one-time capability -- once this document
+                // has a live capability entity, Build is replaced with a
+                // status hint instead of an action that would just 409.
+                // Deleting the entity below (Certifications/Employees/etc.
+                // section) frees the document up to be rebuilt.
+                const alreadyBuilt = builtDocumentIds.has(d.id);
+                return (
+                  <li key={d.id} className="px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+                    <span className="text-sm font-medium truncate min-w-0">{d.file_name}</span>
+                    {alreadyBuilt ? (
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        Capabilities already built — delete the entry below to rebuild
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        <Select
+                          value={selectedType[d.id] ?? ENTITY_TYPES[0]}
+                          onChange={(e) =>
+                            setSelectedType((prev) => ({ ...prev, [d.id]: e.target.value as CapabilityEntityType }))
+                          }
+                          className="!py-1.5 text-xs"
+                        >
+                          {ENTITY_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t.replace(/_/g, " ")}
+                            </option>
+                          ))}
+                        </Select>
+                        <Button size="sm" onClick={() => handleBuild(d.id, d.file_name)}>
+                          Build Capabilities
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardBody>
@@ -133,12 +187,20 @@ export default function Capabilities() {
 
           <EntitySection icon={Award} title="Certifications" empty={graph.certifications.length === 0}>
             {graph.certifications.map((c) => (
-              <li key={c.id} className="py-3 text-sm flex items-center justify-between">
-                <span>
+              <li key={c.id} className="py-3 text-sm flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate">
                   {c.certification_name}
                   {c.issuing_authority && <span className="text-muted-foreground"> — {c.issuing_authority}</span>}
                 </span>
-                <Badge value={c.freshness_status} />
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge value={c.freshness_status} />
+                  {canDeleteCapabilities && (
+                    <DeleteEntityButton
+                      loading={removingId === c.id}
+                      onClick={() => handleRemoveCapability(c.id, c.certification_name)}
+                    />
+                  )}
+                </div>
               </li>
             ))}
           </EntitySection>
@@ -146,12 +208,17 @@ export default function Capabilities() {
           <EntitySection icon={Users} title="Employees" empty={graph.employees.length === 0}>
             {graph.employees.map((e) => (
               <li key={e.id} className="py-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate">
                     {e.name}
                     {e.position && <span className="text-muted-foreground"> — {e.position}</span>}
                   </span>
-                  <Badge value={e.freshness_status} />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge value={e.freshness_status} />
+                    {canDeleteCapabilities && (
+                      <DeleteEntityButton loading={removingId === e.id} onClick={() => handleRemoveCapability(e.id, e.name)} />
+                    )}
+                  </div>
                 </div>
                 {e.skills && <p className="text-xs text-muted-foreground mt-1">{e.skills.join(" · ")}</p>}
               </li>
@@ -160,36 +227,74 @@ export default function Capabilities() {
 
           <EntitySection icon={Briefcase} title="Projects" empty={graph.projects.length === 0}>
             {graph.projects.map((p) => (
-              <li key={p.id} className="py-3 text-sm flex items-center justify-between">
-                <span>
+              <li key={p.id} className="py-3 text-sm flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate">
                   {p.client ?? "Unnamed client"}
                   {p.industry && <span className="text-muted-foreground"> — {p.industry}</span>}
                 </span>
-                <Badge value={p.freshness_status} />
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge value={p.freshness_status} />
+                  {canDeleteCapabilities && (
+                    <DeleteEntityButton
+                      loading={removingId === p.id}
+                      onClick={() => handleRemoveCapability(p.id, p.client ?? "Unnamed client")}
+                    />
+                  )}
+                </div>
               </li>
             ))}
           </EntitySection>
 
           <EntitySection icon={Wrench} title="Equipment" empty={graph.equipment.length === 0}>
             {graph.equipment.map((eq) => (
-              <li key={eq.id} className="py-3 text-sm flex items-center justify-between">
-                <span>{eq.equipment_name}</span>
-                <Badge value={eq.freshness_status} />
+              <li key={eq.id} className="py-3 text-sm flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate">{eq.equipment_name}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge value={eq.freshness_status} />
+                  {canDeleteCapabilities && (
+                    <DeleteEntityButton
+                      loading={removingId === eq.id}
+                      onClick={() => handleRemoveCapability(eq.id, eq.equipment_name)}
+                    />
+                  )}
+                </div>
               </li>
             ))}
           </EntitySection>
 
           <EntitySection icon={Landmark} title="Financial Records" empty={graph.financial_records.length === 0}>
             {graph.financial_records.map((f) => (
-              <li key={f.id} className="py-3 text-sm flex items-center justify-between">
-                <span>{f.financial_year ?? "—"}</span>
-                <Badge value={f.freshness_status} />
+              <li key={f.id} className="py-3 text-sm flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate">{f.financial_year ?? "—"}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge value={f.freshness_status} />
+                  {canDeleteCapabilities && (
+                    <DeleteEntityButton
+                      loading={removingId === f.id}
+                      onClick={() => handleRemoveCapability(f.id, `${f.financial_year ?? "record"} financial record`)}
+                    />
+                  )}
+                </div>
               </li>
             ))}
           </EntitySection>
         </>
       ) : null}
     </div>
+  );
+}
+
+function DeleteEntityButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-danger-soft hover:text-danger transition-colors disabled:opacity-50"
+      aria-label="Delete capability entry"
+    >
+      <Trash2 size={13} />
+    </button>
   );
 }
 

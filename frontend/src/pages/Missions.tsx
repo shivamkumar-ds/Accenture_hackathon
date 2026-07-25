@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { executeMission, listMissions } from "../api/endpoints";
+import { archiveMission, executeMission, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Select, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
 import { tenderDisplayName } from "../lib/tenderName";
-import { ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, Radar } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, Radar, Trash2 } from "lucide-react";
 
 // The brief asked for a visual "story" of the tender journey (Upload ->
 // Extraction -> Matching -> Compliance -> Gap Analysis -> Decision Engine
@@ -76,12 +76,18 @@ export default function Missions() {
   // deployment yet, so the selector only offers the one real option
   // rather than listing choices that would fail.
   const [provider, setProvider] = useState<"openai">("openai");
+  const [archivingId, setArchivingId] = useState<string | null>(null);
   const { notify } = useToast();
   const navigate = useNavigate();
 
   const refresh = async () => {
     try {
-      setMissions(await listMissions());
+      const all = await listMissions();
+      // "Delete tender" = archive (see handleDelete) -- archived missions
+      // are a soft-deleted, hidden-from-active-views state, same as a
+      // deleted document/capability. list_missions() has no status
+      // filter, so this page (and Dashboard/Reports) filter client-side.
+      setMissions(all.filter((m) => m.status !== "archived"));
     } catch (err) {
       notify("error", extractErrorMessage(err));
     } finally {
@@ -110,6 +116,20 @@ export default function Missions() {
       notify("error", extractErrorMessage(err));
     } finally {
       setRunningId(null);
+    }
+  };
+
+  const handleDelete = async (missionId: string, name: string) => {
+    if (!confirm(`Delete "${name}"? It will be removed from Tender Workspace, Dashboard, and Reports.`)) return;
+    setArchivingId(missionId);
+    try {
+      await archiveMission(missionId);
+      notify("success", `"${name}" deleted.`);
+      await refresh();
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setArchivingId(null);
     }
   };
 
@@ -161,6 +181,15 @@ export default function Missions() {
                       >
                         Open <ArrowRight size={13} />
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(m.id, tenderDisplayName(m))}
+                        disabled={archivingId === m.id}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-danger-soft hover:text-danger transition-colors disabled:opacity-50"
+                        aria-label={`Delete ${tenderDisplayName(m)}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
                   <div className="overflow-x-auto pb-1">

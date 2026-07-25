@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listDocuments, uploadDocument } from "../api/endpoints";
+import { deleteDocument, listDocuments, uploadDocument } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { DocumentRead } from "../api/types";
@@ -17,7 +17,7 @@ import {
   SkeletonList,
   StatCard,
 } from "../components/kit";
-import { CheckCircle2, Clock3, FileStack, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, FileStack, Trash2, XCircle } from "lucide-react";
 
 const DOCUMENT_TYPES = [
   "certification",
@@ -36,6 +36,7 @@ export default function Documents() {
   const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0]);
   const [query, setQuery] = useState("");
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { notify } = useToast();
 
   const refresh = async () => {
@@ -75,6 +76,23 @@ export default function Documents() {
       notify("error", extractErrorMessage(err));
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDelete = async (documentId: string, fileName: string) => {
+    if (!confirm(`Delete "${fileName}"? This removes the file and can't be undone.`)) return;
+    setDeletingId(documentId);
+    try {
+      await deleteDocument(documentId);
+      notify("success", `"${fileName}" deleted.`);
+      await refresh();
+    } catch (err) {
+      // 409 here means an active tender or a built capability still
+      // references this document -- extractErrorMessage() surfaces the
+      // backend's exact reason (e.g. "delete the tender first").
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -169,6 +187,7 @@ export default function Documents() {
                     <th className="py-2 px-6 font-medium">Type</th>
                     <th className="py-2 px-6 font-medium">Status</th>
                     <th className="py-2 px-6 font-medium">Uploaded</th>
+                    <th className="py-2 px-6 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -181,6 +200,19 @@ export default function Documents() {
                       </td>
                       <td className="py-3 px-6 text-muted-foreground tabular-nums whitespace-nowrap">
                         {new Date(d.upload_time).toLocaleString()}
+                      </td>
+                      <td className="py-3 px-6">
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(d.id, d.file_name)}
+                            disabled={deletingId === d.id}
+                            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-danger-soft hover:text-danger transition-colors disabled:opacity-50"
+                            aria-label={`Delete ${d.file_name}`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

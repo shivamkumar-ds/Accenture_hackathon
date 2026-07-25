@@ -44,7 +44,10 @@ export default function Reports() {
   useEffect(() => {
     (async () => {
       try {
-        const list = await listMissions();
+        // Archived (= deleted) tenders are excluded here too -- a deleted
+        // tender's report shouldn't still be selectable/downloadable, same
+        // as it's excluded from Tender Workspace and the Dashboard.
+        const list = (await listMissions()).filter((m) => m.status !== "archived");
         setMissions(list);
         const first = list.find((m) => m.recommendation_id);
         if (first) setSelectedId(first.id);

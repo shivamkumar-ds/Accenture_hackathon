@@ -55,7 +55,11 @@ export default function Dashboard() {
   const [runningId, setRunningId] = useState<string | null>(null);
 
   const loadMissions = async () => {
-    const missionList = await listMissions();
+    // Archived (= deleted, see Missions.tsx's "delete tender" -> archive_mission)
+    // missions are excluded from every Dashboard view -- stat cards, Recent
+    // Tenders, Ongoing Analysis, Recent Activity -- same as Tender Workspace
+    // and Reports. list_missions() has no status filter, applied client-side.
+    const missionList = (await listMissions()).filter((m) => m.status !== "archived");
     setMissions(missionList);
 
     // A mission is "reportable"/evaluated as soon as the Decision Engine has

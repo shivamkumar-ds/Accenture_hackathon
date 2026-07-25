@@ -91,3 +91,11 @@ async def save_upload(company_id: uuid.UUID, upload: UploadFile) -> tuple[str, s
 def resolve_path(relative_storage_path: str) -> Path:
     """Resolves a stored relative path back to an absolute filesystem path for retrieval."""
     return STORAGE_ROOT / relative_storage_path
+
+
+def delete_file(relative_storage_path: str) -> None:
+    """Removes the on-disk file for a deleted Document. missing_ok=True --
+    a file that's already gone (e.g. a second delete attempt racing, or
+    manual cleanup) is not itself an error; the DB row's removed_at is
+    the source of truth for "deleted", not the file's existence."""
+    resolve_path(relative_storage_path).unlink(missing_ok=True)

@@ -43,6 +43,12 @@ export const uploadDocument = (file: File, documentType: string) => {
     .then((r) => r.data);
 };
 
+// Soft-delete (removed_at) + real file removal server-side. Blocked with a
+// 409 if an active tender or an active capability entity still references
+// this document -- extractErrorMessage() surfaces that reason to the user.
+export const deleteDocument = (documentId: string) =>
+  apiClient.delete<DocumentRead>(`/api/v1/documents/${documentId}`).then((r) => r.data);
+
 // --- capabilities ---
 
 export const getCapabilityGraph = () =>
@@ -52,6 +58,13 @@ export const buildCapability = (documentId: string, entityType: string) =>
   apiClient
     .post("/api/v1/capabilities/build", { document_id: documentId, entity_type: entityType })
     .then((r) => r.data);
+
+// Admin-only server-side (require_administrator) -- already-existing
+// endpoint (M9 revalidation), just not previously called from the
+// frontend. Soft-removes the entity and re-runs the Decision Engine for
+// any mission whose current recommendation cited it.
+export const deleteCapability = (entityId: string) =>
+  apiClient.delete(`/api/v1/capabilities/${entityId}`).then((r) => r.data);
 
 // --- tenders ---
 
@@ -105,3 +118,11 @@ export const executeMission = (missionId: string, provider?: "openai") =>
   apiClient
     .post<MissionRead>(`/api/v1/missions/${missionId}/execute`, provider ? { provider } : undefined)
     .then((r) => r.data);
+
+// Soft-delete (archive_mission -- flips status to "archived", never a real
+// DELETE per the codebase's own Active/Archived/Deleted convention). This
+// is what "delete tender" means in the UI: the mission/tender pair
+// disappears from active views (Tender Workspace, Dashboard, Reports)
+// but the row and its evaluation history survive.
+export const archiveMission = (missionId: string) =>
+  apiClient.delete<MissionRead>(`/api/v1/missions/${missionId}`).then((r) => r.data);

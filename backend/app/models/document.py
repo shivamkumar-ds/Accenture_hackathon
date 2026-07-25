@@ -43,3 +43,10 @@ class Document(Base, UUIDPrimaryKeyMixin):
     # Confidence pipeline additions (recent schema update)
     extraction_confidence: Mapped[float | None] = mapped_column(Numeric(5, 4), nullable=True)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Soft-delete, same Active/Archived/Deleted convention already used for
+    # Mission (status=ARCHIVED) and the 5 capability entities (removed_at) --
+    # NULL = active. A document is never hard-deleted: its row (and any
+    # historical evaluation that cited derived capability evidence from it)
+    # needs to keep existing even after the user "deletes" it from the UI.
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
