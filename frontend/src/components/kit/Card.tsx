@@ -68,28 +68,32 @@ export function StatCard({
   linkLabel?: string;
 }) {
   return (
-    <Card className="p-3 transition-shadow hover:shadow-elevated flex gap-2.5">
-      {icon && (
-        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 [&_svg]:w-3.5 [&_svg]:h-3.5", statToneClasses[tone])}>
-          {icon}
-        </div>
-      )}
-      <div className="min-w-0 flex-1 flex flex-col">
-        <p className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</p>
-        <p className="text-lg font-bold tracking-tight tabular-nums mt-0.5">{value}</p>
-        {/* Plain text wrapping (not flex+truncate) -- the arrow is a
-            regular character in the same text flow as the label, so on a
-            narrow card the whole line just reflows to a second line like
-            normal text instead of either getting cut off or having the
-            arrow orphaned on its own line (the flex-layout version's
-            problem). */}
-        {trend && <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{trend}</p>}
-        {linkTo && (
-          <Link to={linkTo} className="text-[11px] font-medium text-primary hover:underline mt-1.5 leading-snug">
-            {linkLabel ?? "View all"} <span aria-hidden="true">→</span>
-          </Link>
+    // flex-col at the Card level, not just the text column -- the link is
+    // now a sibling of the icon+text row (not nested inside the indented
+    // text column) with mt-auto, so it always sits pinned to the bottom
+    // edge of the card, flush with the icon's left edge rather than
+    // indented to match the label. Since a CSS grid row stretches every
+    // card in it to the same height, every card's link ends up on the
+    // exact same horizontal line regardless of how much label/trend text
+    // sits above it.
+    <Card className="p-3 transition-shadow hover:shadow-elevated flex flex-col">
+      <div className="flex gap-2.5">
+        {icon && (
+          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 [&_svg]:w-3.5 [&_svg]:h-3.5", statToneClasses[tone])}>
+            {icon}
+          </div>
         )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</p>
+          <p className="text-lg font-bold tracking-tight tabular-nums mt-0.5">{value}</p>
+          {trend && <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{trend}</p>}
+        </div>
       </div>
+      {linkTo && (
+        <Link to={linkTo} className="text-[11px] font-medium text-primary hover:underline mt-auto pt-2.5 leading-snug">
+          {linkLabel ?? "View all"} <span aria-hidden="true">→</span>
+        </Link>
+      )}
     </Card>
   );
 }
