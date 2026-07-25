@@ -4,10 +4,10 @@ import { archiveMission, executeMission, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Input, Select, SkeletonList } from "../components/kit";
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Input, Menu, MenuItem, Select, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
 import { tenderDisplayName } from "../lib/tenderName";
-import { ArrowRight, CheckCircle2, Clock3, FileUp, Loader2, Radar, Search, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileUp, Loader2, MoreVertical, Radar, Search, Sparkles, Trash2 } from "lucide-react";
 
 // The brief asked for a visual "story" of the tender journey (Upload ->
 // Extraction -> Matching -> Compliance -> Gap Analysis -> Decision Engine
@@ -274,15 +274,25 @@ export default function Missions() {
                       >
                         Open <ArrowRight size={13} />
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(m.id, tenderDisplayName(m))}
-                        disabled={archivingId === m.id}
-                        className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-danger-soft hover:text-danger transition-colors disabled:opacity-50"
-                        aria-label={`Delete ${tenderDisplayName(m)}`}
+                      <Menu
+                        label={`More actions for ${tenderDisplayName(m)}`}
+                        trigger={
+                          <span className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-surface-hover transition-colors">
+                            <MoreVertical size={15} />
+                          </span>
+                        }
                       >
-                        <Trash2 size={14} />
-                      </button>
+                        <MenuItem icon={<ExternalLink size={14} />} onClick={() => navigate(`/missions/${m.id}`)}>
+                          Open
+                        </MenuItem>
+                        <MenuItem
+                          icon={<Trash2 size={14} />}
+                          danger
+                          onClick={() => handleDelete(m.id, tenderDisplayName(m))}
+                        >
+                          {archivingId === m.id ? "Deleting…" : "Delete"}
+                        </MenuItem>
+                      </Menu>
                     </div>
                   </div>
                   <div className="overflow-x-auto pb-1">
