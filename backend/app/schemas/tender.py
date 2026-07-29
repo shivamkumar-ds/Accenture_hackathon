@@ -15,6 +15,7 @@ class TenderRead(BaseModel):
     mission_id: uuid.UUID
     tender_name: str | None
     organization: str | None
+    category: str | None
     closing_date: date | None
     uploaded_document: uuid.UUID | None
     processing_status: str | None

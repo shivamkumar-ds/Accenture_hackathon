@@ -35,6 +35,7 @@ async def upload_tender(
     tender_name: str | None = None,
     organization: str | None = None,
     closing_date: date | None = None,
+    category: str | None = None,
 ) -> tuple[Mission, Tender]:
     document = await document_service.upload_document(db, company_id, uploaded_by, "tender", file)
 
@@ -51,6 +52,7 @@ async def upload_tender(
         mission_id=mission.id,
         tender_name=tender_name,
         organization=organization,
+        category=category,
         closing_date=closing_date,
         uploaded_document=document.id,
         processing_status=DocumentProcessingStatus.PENDING.value,

@@ -41,6 +41,7 @@ async def upload_tender(
     file: UploadFile = File(...),
     tender_name: str | None = Form(None),
     organization: str | None = Form(None),
+    category: str | None = Form(None),
     closing_date: date | None = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -51,7 +52,7 @@ async def upload_tender(
     # FileTooLargeError) -- both now map to the same clean 415/413 via the
     # centralized handler in app/core/exception_handlers.py (Phase 1.5 #4+5).
     mission, tender = await tender_service.upload_tender(
-        db, current_user.company_id, current_user.id, file, tender_name, organization, closing_date
+        db, current_user.company_id, current_user.id, file, tender_name, organization, closing_date, category
     )
     return TenderUploadResult(tender_id=tender.id, mission_id=mission.id)
 

@@ -13,3 +13,4 @@ export * from "./Logo";
 export * from "./Switch";
 export * from "./Menu";
 export * from "./StatusDonut";
+export * from "./Combobox";

@@ -20,6 +20,13 @@ class Tender(Base, UUIDPrimaryKeyMixin):
     )
     tender_name: Mapped[str | None] = mapped_column(String, nullable=True)
     organization: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Free-text category label chosen from the frontend's static
+    # TENDER_CATEGORIES list (lib/tenderCategories.ts) -- stored as plain
+    # text, not an enum, since the category list is a product/UX choice
+    # that may grow without a schema migration. Nullable at the DB level
+    # so existing rows uploaded before this column existed stay valid;
+    # the frontend enforces it as required for new uploads.
+    category: Mapped[str | None] = mapped_column(String, nullable=True)
     closing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     uploaded_document: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("documents.id"), nullable=True

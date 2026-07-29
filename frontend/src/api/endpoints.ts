@@ -75,12 +75,13 @@ export const deleteCapability = (entityId: string) =>
 
 export const uploadTender = (
   file: File,
-  fields: { tender_name?: string; organization?: string; closing_date?: string }
+  fields: { tender_name?: string; organization?: string; category?: string; closing_date?: string }
 ) => {
   const form = new FormData();
   form.append("file", file);
   if (fields.tender_name) form.append("tender_name", fields.tender_name);
   if (fields.organization) form.append("organization", fields.organization);
+  if (fields.category) form.append("category", fields.category);
   if (fields.closing_date) form.append("closing_date", fields.closing_date);
   return apiClient
     .post<TenderUploadResponse>("/api/v1/tenders/upload", form, {

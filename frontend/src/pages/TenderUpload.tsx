@@ -3,17 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { extractTenderMetadata, uploadTender } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
-import { Button, Card, CardBody, CardHeader, Dropzone, Input } from "../components/kit";
+import { Button, Card, CardBody, CardHeader, Combobox, Dropzone, Input } from "../components/kit";
+import { TENDER_CATEGORIES } from "../lib/tenderCategories";
 
 export default function TenderUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [tenderName, setTenderName] = useState("");
   const [organization, setOrganization] = useState("");
+  const [category, setCategory] = useState("");
   const [closingDate, setClosingDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const { notify } = useToast();
   const navigate = useNavigate();
+
+  // All five fields are mandatory -- the Upload Tender button stays
+  // disabled until every one of them is filled in.
+  const isComplete = Boolean(file && tenderName.trim() && organization.trim() && category && closingDate);
 
   // Best-effort prefill from the PDF's own text -- heuristic-only, never
   // overwrites anything the user already typed, and silently no-ops on
@@ -36,12 +42,13 @@ export default function TenderUpload() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
+    if (!isComplete || !file) return;
     setLoading(true);
     try {
       const res = await uploadTender(file, {
         tender_name: tenderName || undefined,
         organization: organization || undefined,
+        category: category || undefined,
         closing_date: closingDate || undefined,
       });
       if (!res.tender_id) {
@@ -71,24 +78,37 @@ export default function TenderUpload() {
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="space-y-4">
               <Input
-                label="Tender Name (optional)"
+                label="Tender Name"
+                required
                 value={tenderName}
                 onChange={(e) => setTenderName(e.target.value)}
                 placeholder={extracting ? "Reading PDF…" : undefined}
               />
               <Input
-                label="Organization (optional)"
+                label="Organization"
+                required
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
                 placeholder={extracting ? "Reading PDF…" : undefined}
               />
-              <Input
-                label="Closing Date (optional)"
-                type="date"
-                value={closingDate}
-                onChange={(e) => setClosingDate(e.target.value)}
-              />
-              <Button type="submit" loading={loading} disabled={!file} className="w-full" size="lg">
+              <div className="grid grid-cols-2 gap-3">
+                <Combobox
+                  label="Category"
+                  value={category}
+                  onChange={setCategory}
+                  options={TENDER_CATEGORIES}
+                  placeholder="Select category"
+                  searchPlaceholder="Search categories…"
+                />
+                <Input
+                  label="Closing Date"
+                  type="date"
+                  required
+                  value={closingDate}
+                  onChange={(e) => setClosingDate(e.target.value)}
+                />
+              </div>
+              <Button type="submit" loading={loading} disabled={!isComplete} className="w-full" size="lg">
                 Upload Tender
               </Button>
             </div>

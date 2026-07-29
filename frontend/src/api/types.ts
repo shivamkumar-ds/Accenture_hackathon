@@ -160,6 +160,7 @@ export interface TenderRead {
   mission_id: string;
   tender_name: string | null;
   organization: string | null;
+  category: string | null;
   closing_date: string | null;
   uploaded_document: string | null;
   processing_status: string | null;
