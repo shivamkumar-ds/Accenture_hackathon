@@ -13,6 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.exception_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging
 from app.core.rate_limit import limiter
 
@@ -82,6 +83,11 @@ app.add_middleware(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+# Centralized service-exception -> HTTP mapping + logging (Phase 1.5
+# findings #4 and #5) -- see app/core/exception_handlers.py. Routers no
+# longer need their own try/except NotFoundError/ConflictError/... blocks.
+register_exception_handlers(app)
 
 app.include_router(api_router, prefix="/api/v1")
 

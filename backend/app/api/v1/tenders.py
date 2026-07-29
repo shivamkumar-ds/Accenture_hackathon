@@ -10,7 +10,7 @@ nested under a shared prefix.
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -26,7 +26,6 @@ from app.schemas.tender import (
     TenderWithRequirements,
 )
 from app.services import tender_service
-from app.services.exceptions import ExtractionError, FileTooLargeError, NotFoundError, UnsupportedFileTypeError
 
 tenders_router = APIRouter(prefix="/tenders", tags=["tenders"])
 analysis_router = APIRouter(prefix="/analysis", tags=["analysis"])
@@ -48,22 +47,12 @@ async def upload_tender(
 ) -> TenderUploadResult:
     # RC-1 audit finding B1: tender_service.upload_tender() calls the same
     # document_service.upload_document() that POST /documents/upload uses,
-    # capable of raising the same two exceptions -- this router previously
-    # had no try/except at all, so an oversized or wrong-type tender file
-    # produced an unhandled 500 instead of the clean 413/415 that
-    # /documents/upload already returns for the identical underlying error.
-    try:
-        mission, tender = await tender_service.upload_tender(
-            db, current_user.company_id, current_user.id, file, tender_name, organization, closing_date
-        )
-    except UnsupportedFileTypeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)
-        ) from exc
-    except FileTooLargeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
-        ) from exc
+    # capable of raising the same two exceptions (UnsupportedFileTypeError,
+    # FileTooLargeError) -- both now map to the same clean 415/413 via the
+    # centralized handler in app/core/exception_handlers.py (Phase 1.5 #4+5).
+    mission, tender = await tender_service.upload_tender(
+        db, current_user.company_id, current_user.id, file, tender_name, organization, closing_date
+    )
     return TenderUploadResult(tender_id=tender.id, mission_id=mission.id)
 
 
@@ -76,12 +65,7 @@ async def extract_metadata(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ) -> TenderMetadataGuess:
-    try:
-        guess = await tender_service.extract_tender_metadata(file)
-    except ExtractionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+    guess = await tender_service.extract_tender_metadata(file)
     return TenderMetadataGuess(**guess)
 
 
@@ -91,10 +75,7 @@ def get_tender(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> TenderWithRequirements:
-    try:
-        tender = tender_service.get_tender(db, tender_id, current_user.company_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    tender = tender_service.get_tender(db, tender_id, current_user.company_id)
     requirements = tender_service.get_requirements(db, tender.id)
     return TenderWithRequirements(
         tender=TenderRead.model_validate(tender),
@@ -117,16 +98,9 @@ async def run_analysis(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> TenderWithRequirements:
-    try:
-        tender, requirements = await tender_service.run_analysis(
-            db, payload.tender_id, current_user.company_id
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ExtractionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+    tender, requirements = await tender_service.run_analysis(
+        db, payload.tender_id, current_user.company_id
+    )
 
     return TenderWithRequirements(
         tender=TenderRead.model_validate(tender),

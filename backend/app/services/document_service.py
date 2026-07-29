@@ -8,6 +8,7 @@ mapped to a 404 by the router) — never a distinguishable error that
 would let one tenant infer another tenant's document IDs exist.
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -18,6 +19,8 @@ from app.core import storage
 from app.models import Document, Mission, Tender
 from app.models.enums import MissionStatus
 from app.services.exceptions import ConflictError, NotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 async def upload_document(
@@ -41,6 +44,12 @@ async def upload_document(
     try:
         db.commit()
     except Exception:
+        logger.exception(
+            "Document upload failed, rolling back: company_id=%s document_type=%s file_name=%s",
+            company_id,
+            document_type,
+            file.filename,
+        )
         db.rollback()
         storage.resolve_path(relative_path).unlink(missing_ok=True)
         raise

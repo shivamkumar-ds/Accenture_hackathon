@@ -41,7 +41,6 @@ from app.schemas.capability_graph import (
     ProjectGraphEntry,
 )
 from app.services import capability_service
-from app.services.exceptions import ConflictError, ExtractionError, NotFoundError
 from app.services.freshness import evaluate_freshness
 
 router = APIRouter(prefix="/capabilities", tags=["capabilities"])
@@ -78,18 +77,9 @@ async def build_capability(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"'{payload.entity_type.value}' is not supported by the Capability Builder in M3.",
         )
-    try:
-        entity_type, entity = await capability_service.build_capability_from_document(
-            db, payload.document_id, current_user.company_id, payload.entity_type
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    except ExtractionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+    entity_type, entity = await capability_service.build_capability_from_document(
+        db, payload.document_id, current_user.company_id, payload.entity_type
+    )
 
     return _serialize(entity_type, entity)
 
@@ -189,14 +179,13 @@ async def update_capability(
     current_user: User = Depends(require_administrator),
     db: Session = Depends(get_db),
 ) -> RevalidationResult:
+    # ValueError (invalid field name/value) is local to this endpoint, not
+    # part of the shared service-exception set -- NotFoundError/ConflictError
+    # now propagate to the centralized handler (app/core/exception_handlers.py).
     try:
         result = await revalidation_service.handle_capability_update(
             db, entity_id, current_user.company_id, payload.fields
         )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return RevalidationResult(**result)
@@ -208,12 +197,7 @@ async def remove_capability(
     current_user: User = Depends(require_administrator),
     db: Session = Depends(get_db),
 ) -> RevalidationResult:
-    try:
-        result = await revalidation_service.handle_capability_removal(db, entity_id, current_user.company_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    result = await revalidation_service.handle_capability_removal(db, entity_id, current_user.company_id)
     return RevalidationResult(
         entity_id=result["entity_id"],
         changed_fields=[],

@@ -11,7 +11,7 @@ assembly function, since both are in the frozen, approved spec.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,6 @@ from app.core.rate_limit import limiter
 from app.models import User
 from app.schemas.decision import ComplianceMatrixEntryRead, EvaluationResponse, GapAnalysisEntry, RecommendationRead
 from app.services import decision_service
-from app.services.exceptions import ExtractionError, NotFoundError
 
 evaluation_router = APIRouter(prefix="/evaluation", tags=["evaluation"])
 recommendations_router = APIRouter(prefix="/recommendations", tags=["recommendations"])
@@ -81,15 +80,10 @@ async def run_evaluation(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> EvaluationResponse:
-    try:
-        await decision_service.run_evaluation(db, payload.mission_id, current_user.company_id)
-        recommendation, compliance_rows, requirements_by_id = decision_service.get_evaluation_bundle(
-            db, payload.mission_id, current_user.company_id
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ExtractionError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    await decision_service.run_evaluation(db, payload.mission_id, current_user.company_id)
+    recommendation, compliance_rows, requirements_by_id = decision_service.get_evaluation_bundle(
+        db, payload.mission_id, current_user.company_id
+    )
 
     return _build_response(db, recommendation, compliance_rows, requirements_by_id)
 
@@ -100,12 +94,9 @@ def get_evaluation(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> EvaluationResponse:
-    try:
-        recommendation, compliance_rows, requirements_by_id = decision_service.get_evaluation_bundle(
-            db, mission_id, current_user.company_id
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    recommendation, compliance_rows, requirements_by_id = decision_service.get_evaluation_bundle(
+        db, mission_id, current_user.company_id
+    )
     return _build_response(db, recommendation, compliance_rows, requirements_by_id)
 
 
@@ -116,10 +107,7 @@ def get_recommendation(
     db: Session = Depends(get_db),
 ) -> EvaluationResponse:
     # Same assembly as GET /evaluation/{mission_id} — see module docstring.
-    try:
-        recommendation, compliance_rows, requirements_by_id = decision_service.get_evaluation_bundle(
-            db, mission_id, current_user.company_id
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    recommendation, compliance_rows, requirements_by_id = decision_service.get_evaluation_bundle(
+        db, mission_id, current_user.company_id
+    )
     return _build_response(db, recommendation, compliance_rows, requirements_by_id)

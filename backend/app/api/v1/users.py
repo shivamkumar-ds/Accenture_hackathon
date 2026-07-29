@@ -6,7 +6,7 @@ GET requires any authenticated user, and is scoped to their own company
 (never returns another company's users, regardless of role).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_administrator
@@ -14,7 +14,6 @@ from app.core.database import get_db
 from app.models import User
 from app.schemas.user import UserCreate, UserRead
 from app.services import user_service
-from app.services.exceptions import ConflictError
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -25,12 +24,9 @@ def create_user(
     admin: User = Depends(require_administrator),
     db: Session = Depends(get_db),
 ) -> UserRead:
-    try:
-        return user_service.create_user(
-            db, admin.company_id, payload.name, payload.email, payload.password, payload.role
-        )
-    except ConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return user_service.create_user(
+        db, admin.company_id, payload.name, payload.email, payload.password, payload.role
+    )
 
 
 @router.get("", response_model=list[UserRead])

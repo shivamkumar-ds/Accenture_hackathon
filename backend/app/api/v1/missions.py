@@ -9,7 +9,7 @@ in the frozen doc names an execution trigger, same precedent as
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -19,7 +19,6 @@ from app.models import Document, Mission, Tender, User
 from app.schemas.decision import RecommendationRead
 from app.schemas.mission import ExecuteMissionRequest, MissionRead
 from app.services import decision_service, mission_service
-from app.services.exceptions import ConflictError, ExtractionError, NotFoundError
 
 router = APIRouter(prefix="/missions", tags=["missions"])
 
@@ -70,10 +69,7 @@ def get_mission(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MissionRead:
-    try:
-        mission = mission_service.get_mission(db, mission_id, current_user.company_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    mission = mission_service.get_mission(db, mission_id, current_user.company_id)
     return _attach_tender_info(db, [mission])[0]
 
 
@@ -84,10 +80,7 @@ def archive_mission(
     db: Session = Depends(get_db),
 ) -> MissionRead:
     """Archives (soft-delete), never a real DELETE — see mission_service.archive_mission."""
-    try:
-        return mission_service.archive_mission(db, mission_id, current_user.company_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return mission_service.archive_mission(db, mission_id, current_user.company_id)
 
 
 # 10/minute per IP (Phase 1.5 finding #2) -- this is the Mission
@@ -106,16 +99,9 @@ async def execute_mission(
     db: Session = Depends(get_db),
 ) -> MissionRead:
     provider = payload.provider if payload else None
-    try:
-        return await mission_service.execute_mission(
-            db, mission_id, current_user.company_id, current_user.id, provider=provider
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    except ExtractionError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return await mission_service.execute_mission(
+        db, mission_id, current_user.company_id, current_user.id, provider=provider
+    )
 
 
 @router.get("/{mission_id}/recommendations", response_model=list[RecommendationRead])
@@ -130,9 +116,6 @@ def list_mission_recommendations(
     Mission.recommendation_id alone is not enough to see this: it
     deliberately keeps pointing at whatever was actually decided on.
     """
-    try:
-        mission_service.get_mission(db, mission_id, current_user.company_id)  # scoping check
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    mission_service.get_mission(db, mission_id, current_user.company_id)  # scoping check
     recommendations = decision_service.get_recommendations_for_mission(db, mission_id)
     return [RecommendationRead.model_validate(r) for r in recommendations]

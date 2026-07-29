@@ -23,7 +23,6 @@ from app.core.database import get_db
 from app.models import User
 from app.schemas.company import CompanyRead
 from app.services import company_service
-from app.services.exceptions import NotFoundError
 
 router = APIRouter(prefix="/company", tags=["company"])
 
@@ -45,7 +44,4 @@ def get_company(
     """
     if company_id != current_user.company_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Company '{company_id}' not found.")
-    try:
-        return company_service.get_company(db, company_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return company_service.get_company(db, company_id)

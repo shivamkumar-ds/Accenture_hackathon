@@ -19,7 +19,7 @@ governs the lifecycle of a recommendation that already exists.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_approver, require_business_decision_permission
@@ -34,7 +34,6 @@ from app.schemas.approval import (
 from app.schemas.decision import ComplianceMatrixEntryRead, RecommendationRead
 from app.schemas.mission import MissionRead
 from app.services import approval_service, decision_service
-from app.services.exceptions import ConflictError, NotFoundError
 
 compliance_router = APIRouter(prefix="/compliance", tags=["approval"])
 approval_router = APIRouter(prefix="/approval", tags=["approval"])
@@ -47,15 +46,10 @@ def verify_compliance_row(
     current_user: User = Depends(require_approver),
     db: Session = Depends(get_db),
 ) -> ComplianceMatrixEntryRead:
-    try:
-        row = approval_service.verify_compliance_row(
-            db, compliance_id, current_user.company_id, current_user.id,
-            payload.verification_status, payload.note,
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    row = approval_service.verify_compliance_row(
+        db, compliance_id, current_user.company_id, current_user.id,
+        payload.verification_status, payload.note,
+    )
     verifier_names = decision_service.resolve_verifier_names(db, [row])
     return ComplianceMatrixEntryRead.model_validate(row).model_copy(
         update={"verified_by_name": verifier_names.get(row.verified_by)}
@@ -68,15 +62,10 @@ def record_decision(
     current_user: User = Depends(require_business_decision_permission),
     db: Session = Depends(get_db),
 ) -> MissionRead:
-    try:
-        mission = approval_service.record_decision(
-            db, payload.mission_id, current_user.company_id, current_user.id,
-            payload.decision, payload.reason,
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    mission = approval_service.record_decision(
+        db, payload.mission_id, current_user.company_id, current_user.id,
+        payload.decision, payload.reason,
+    )
     return MissionRead.model_validate(mission)
 
 
@@ -86,12 +75,9 @@ def get_approval_history(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ApprovalHistoryResponse:
-    try:
-        mission, recommendation, compliance_rows, decision_events = approval_service.get_approval_history(
-            db, mission_id, current_user.company_id
-        )
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    mission, recommendation, compliance_rows, decision_events = approval_service.get_approval_history(
+        db, mission_id, current_user.company_id
+    )
 
     return ApprovalHistoryResponse(
         mission=MissionRead.model_validate(mission),

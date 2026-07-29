@@ -17,7 +17,6 @@ from app.core.rate_limit import limiter
 from app.models import User
 from app.schemas.document import DocumentRead
 from app.services import document_service
-from app.services.exceptions import ConflictError, FileTooLargeError, NotFoundError, UnsupportedFileTypeError
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -33,18 +32,9 @@ async def upload_document(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> DocumentRead:
-    try:
-        return await document_service.upload_document(
-            db, current_user.company_id, current_user.id, document_type, file
-        )
-    except UnsupportedFileTypeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)
-        ) from exc
-    except FileTooLargeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
-        ) from exc
+    return await document_service.upload_document(
+        db, current_user.company_id, current_user.id, document_type, file
+    )
 
 
 @router.get("", response_model=list[DocumentRead])
@@ -61,10 +51,7 @@ def get_document(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> DocumentRead:
-    try:
-        return document_service.get_document(db, document_id, current_user.company_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return document_service.get_document(db, document_id, current_user.company_id)
 
 
 @router.delete("/{document_id}", response_model=DocumentRead)
@@ -76,12 +63,7 @@ def delete_document(
     """Soft-delete + real file removal -- see document_service.delete_document
     for the exact blocking conditions (active tender / active capability
     still referencing it)."""
-    try:
-        return document_service.delete_document(db, document_id, current_user.company_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except ConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return document_service.delete_document(db, document_id, current_user.company_id)
 
 
 @router.get("/{document_id}/download")
@@ -90,10 +72,7 @@ def download_document(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> FileResponse:
-    try:
-        document = document_service.get_document(db, document_id, current_user.company_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    document = document_service.get_document(db, document_id, current_user.company_id)
 
     file_path = storage.resolve_path(document.storage_path)
     if not file_path.exists():
