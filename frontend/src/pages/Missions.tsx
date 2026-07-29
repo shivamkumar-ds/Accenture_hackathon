@@ -4,7 +4,7 @@ import { archiveMission, executeMission, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Input, Menu, MenuItem, Select, SkeletonList } from "../components/kit";
+import { Badge, Button, Card, CardBody, EmptyState, Input, Menu, MenuItem, Select, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
 import { tenderDisplayName } from "../lib/tenderName";
 import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileUp, Loader2, MoreVertical, Radar, Search, Sparkles, Trash2 } from "lucide-react";

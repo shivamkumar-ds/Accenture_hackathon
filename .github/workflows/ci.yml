@@ -1,10 +1,15 @@
 # Minimal CI (RC-2 remediation, item 5).
 #
 # Deliberately small, per explicit instruction: backend pytest, frontend
-# typecheck, frontend build. Nothing more -- no deployment automation, no
+# lint + typecheck + build. Nothing more -- no deployment automation, no
 # Docker publishing, no complex DevOps pipeline. Two independent jobs
 # (backend/frontend never share a runner or depend on each other, matching
 # how the two halves of this repo are actually developed and tested).
+#
+# Lint step added Phase 1.5 finding #10 -- ESLint didn't exist as a CI gate
+# until now, so the `// eslint-disable-next-line react-hooks/exhaustive-deps`
+# comments already in the codebase were no-ops (nothing was linting the
+# project to suppress).
 #
 # No database service container: the backend test suite (see
 # backend/tests/) builds its own in-memory SQLite database per test file
@@ -42,7 +47,7 @@ jobs:
         run: python -m pytest -q
 
   frontend:
-    name: Frontend typecheck + build
+    name: Frontend lint + typecheck + build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -58,6 +63,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
 
       - name: Typecheck
         run: npx tsc -b
