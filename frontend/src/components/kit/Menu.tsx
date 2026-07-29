@@ -47,6 +47,45 @@ export function Menu({
     };
   }, [open]);
 
+  // Phase 1.5 finding #13: Escape-to-close + arrow-key traversal between
+  // items -- previously a keyboard user could open the menu (the trigger
+  // itself was already reachable/activatable) but had no way to move
+  // between items or dismiss the panel without a mouse click elsewhere.
+  useEffect(() => {
+    if (!open) return;
+    // Focus the first item once the panel has actually mounted into the
+    // portal, matching the standard "menu opens -> focus moves in" pattern.
+    const items = () => Array.from(panelRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []);
+    items()[0]?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+        return;
+      }
+      const focusable = items();
+      if (focusable.length === 0) return;
+      const currentIndex = focusable.indexOf(document.activeElement as HTMLButtonElement);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusable[(currentIndex + 1) % focusable.length].focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusable[(currentIndex - 1 + focusable.length) % focusable.length].focus();
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        focusable[0].focus();
+      } else if (e.key === "End") {
+        e.preventDefault();
+        focusable[focusable.length - 1].focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   function toggle() {
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
@@ -81,6 +120,7 @@ export function Menu({
         createPortal(
           <div
             ref={panelRef}
+            role="menu"
             style={{ position: "fixed", top: coords.top, left: coords.left, width: PANEL_WIDTH }}
             className={cn("rounded-lg border border-border bg-surface shadow-elevated py-1.5 z-[100] animate-fade-in")}
             onClick={() => setOpen(false)}
@@ -97,6 +137,7 @@ export function MenuItem({ icon, children, onClick, danger = false }: { icon?: R
   return (
     <button
       type="button"
+      role="menuitem"
       onClick={onClick}
       className={cn(
         "w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-left transition-colors",
