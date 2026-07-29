@@ -56,6 +56,18 @@ class ComplianceMatrixEntryRead(BaseModel):
     source_page: int | None = None
     evidence_source: EvidenceSourceRead | None = None
 
+    # Verification metadata (Compliance Verification UI). verified_by and
+    # verified_at are already columns on the ComplianceMatrix ORM row, so
+    # model_validate() populates them for free. verified_by_name is not --
+    # same not-on-the-ORM-row treatment as evidence_source above, resolved
+    # via decision_service.resolve_verifier_names() and attached the same
+    # way (model_copy(update=...)) in _build_response(). All three are
+    # additive and default to None so this stays a pure wire-contract
+    # addition, matching source_page/evidence_source's own precedent.
+    verified_by: uuid.UUID | None = None
+    verified_by_name: str | None = None
+    verified_at: datetime | None = None
+
 
 class RecommendationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)

@@ -15,9 +15,9 @@ const toneClasses: Record<Tone, string> = {
 // anywhere in the product maps here ONCE, so tone is always consistent
 // regardless of which page renders it.
 const semanticTone: Record<string, Tone> = {
-  met: "success", go: "success", low: "success", completed: "success", active: "success", verified: "success",
-  conditional: "warning", conditional_go: "warning", medium: "warning", review: "warning", review_required: "warning", pending: "neutral", stale: "warning", processing: "info",
-  not_met: "danger", no_go: "danger", critical: "danger", high: "danger", failed: "danger", expired: "danger",
+  met: "success", go: "success", low: "success", completed: "success", active: "success", verified: "success", verified_compliant: "success",
+  conditional: "warning", conditional_go: "warning", medium: "warning", review: "warning", review_required: "warning", pending: "neutral", stale: "warning", processing: "info", escalated: "warning",
+  not_met: "danger", no_go: "danger", critical: "danger", high: "danger", failed: "danger", expired: "danger", verified_non_compliant: "danger",
   running: "info", created: "neutral", awaiting_approval: "warning", archived: "neutral", current: "success",
   mandatory: "neutral",
 };

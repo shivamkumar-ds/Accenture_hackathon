@@ -202,6 +202,12 @@ export interface EvidenceSourceRead {
   source_document_name: string | null;
 }
 
+// Excludes "pending" where the value is being set BY a human (that's the
+// starting state, not a target one -- same rule the backend's
+// VerifyComplianceRequest validator already enforces).
+export type ComplianceMatrixVerificationStatus = "pending" | "verified_compliant" | "verified_non_compliant" | "escalated";
+export type VerificationDecision = Exclude<ComplianceMatrixVerificationStatus, "pending">;
+
 export interface ComplianceMatrixEntryRead {
   id: string;
   requirement_id: string;
@@ -211,13 +217,26 @@ export interface ComplianceMatrixEntryRead {
   requires_verification: boolean;
   verification_reason: string | null;
   risk_level: RiskLevel | null;
-  verification_status: "pending" | "verified_compliant" | "verified_non_compliant" | "escalated";
+  verification_status: ComplianceMatrixVerificationStatus;
   matching_confidence: number | null;
   evidence_reference: string | null;
   // "Source Clause" leg -- which tender document page this requirement came
   // from. "Company Document" leg -- which company record + upload backs it.
   source_page: number | null;
   evidence_source: EvidenceSourceRead | null;
+  // Verification metadata (Compliance Verification UI). Never render
+  // verified_by (a raw user id) directly -- verified_by_name is the
+  // resolved display name, added specifically so the badge never has to
+  // say "by you" for a mission another user opens later.
+  verified_by: string | null;
+  verified_by_name: string | null;
+  verified_at: string | null;
+}
+
+// POST /api/v1/compliance/{id}/verify
+export interface VerifyComplianceRequest {
+  verification_status: VerificationDecision;
+  note: string | null;
 }
 
 export interface GapAnalysisEntry {

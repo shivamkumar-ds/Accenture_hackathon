@@ -315,6 +315,25 @@ def get_evaluation_bundle(db: Session, mission_id: uuid.UUID, company_id: uuid.U
     return recommendation, compliance_rows, requirements_by_id
 
 
+def resolve_verifier_names(db: Session, compliance_rows: list[ComplianceMatrix]) -> dict[uuid.UUID, str]:
+    """
+    Resolves each row's verified_by (a User id) into that user's display
+    name -- the one piece of verification metadata not already sitting on
+    the ComplianceMatrix ORM row itself. Same shape as
+    resolve_evidence_sources() below: read-time only, nothing persisted,
+    tolerant of a verifier whose account no longer resolves (skipped, not
+    raised). Returns keyed by user id so callers can do
+    `names.get(row.verified_by)`.
+    """
+    from app.models import User
+
+    verifier_ids = {row.verified_by for row in compliance_rows if row.verified_by is not None}
+    if not verifier_ids:
+        return {}
+    users = db.query(User).filter(User.id.in_(verifier_ids)).all()
+    return {user.id: user.name for user in users}
+
+
 def resolve_evidence_sources(
     db: Session, compliance_rows: list[ComplianceMatrix]
 ) -> dict[uuid.UUID, EvidenceSourceRead]:

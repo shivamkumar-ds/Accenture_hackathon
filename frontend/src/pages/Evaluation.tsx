@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getEvaluation, getMission, recordDecision, runEvaluation } from "../api/endpoints";
+import { getEvaluation, getMission, recordDecision, runEvaluation, verifyComplianceRow } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import { recommendationLabel } from "../lib/recommendationLabels";
 import { mergeRequirementContext, type MergedComplianceEntry } from "../lib/complianceMerge";
-import type { BusinessDecision, ComplianceMatrixEntryRead, EvaluationResponse, MatchStatus, MissionRead } from "../api/types";
+import type {
+  BusinessDecision,
+  ComplianceMatrixEntryRead,
+  EvaluationResponse,
+  MatchStatus,
+  MissionRead,
+  VerificationDecision,
+} from "../api/types";
 import {
   AIProcessing,
   Badge,
@@ -21,8 +28,17 @@ import {
   Skeleton,
   Textarea,
 } from "../components/kit";
-import { AlertOctagon, Check, ChevronDown, RefreshCw, ShieldQuestion, TrendingUp, X } from "lucide-react";
+import { AlertOctagon, Check, ChevronDown, RefreshCw, ShieldCheck, ShieldQuestion, TrendingUp, X } from "lucide-react";
 import { cn } from "../lib/cn";
+
+// The three real target values a human can verify a compliance row to --
+// "pending" is the starting state, never a target one (same rule the
+// backend's VerifyComplianceRequest validator already enforces).
+const VERIFY_OPTIONS: { value: VerificationDecision; label: string }[] = [
+  { value: "verified_compliant", label: "Verified Compliant" },
+  { value: "verified_non_compliant", label: "Verified Non-Compliant" },
+  { value: "escalated", label: "Escalated" },
+];
 
 const DECISION_STAGES = [
   "Loading capability library…",
@@ -116,6 +132,30 @@ export default function Evaluation() {
     () => (data?.gap_analysis ?? []).filter((g) => g.mandatory && g.status === "not_met"),
     [data]
   );
+
+  // UI-only readiness indicator, mirroring (not duplicating) the backend's
+  // approval_service.get_blocking_rows() rule -- the backend remains the
+  // sole enforcement (a 409 on Save is still possible, e.g. a race with
+  // another user), this is guidance computed entirely from fields already
+  // on the wire so a blocking row is visible before Save is even clicked.
+  const blockingRows = useMemo(
+    () =>
+      (data?.compliance_matrix ?? []).filter(
+        (row) =>
+          row.requires_verification &&
+          (row.risk_level === "high" || row.risk_level === "critical") &&
+          row.verification_status === "pending"
+      ),
+    [data]
+  );
+
+  const handleRowVerified = (updated: ComplianceMatrixEntryRead) => {
+    setData((prev) =>
+      prev
+        ? { ...prev, compliance_matrix: prev.compliance_matrix.map((row) => (row.id === updated.id ? updated : row)) }
+        : prev
+    );
+  };
 
   const filtered = useMemo(() => {
     return merged.filter((c) => {
@@ -333,7 +373,12 @@ export default function Evaluation() {
                   {expanded[status] && (
                     <ul className="divide-y divide-border bg-muted/30">
                       {grouped[status].map((entry) => (
-                        <MatrixRow key={entry.id} entry={entry} />
+                        <MatrixRow
+                          key={entry.id}
+                          entry={entry}
+                          missionStatus={mission?.status ?? null}
+                          onVerified={handleRowVerified}
+                        />
                       ))}
                     </ul>
                   )}
@@ -343,7 +388,12 @@ export default function Evaluation() {
           ) : (
             <ul className="divide-y divide-border -mx-6">
               {filtered.map((entry) => (
-                <MatrixRow key={entry.id} entry={entry} />
+                <MatrixRow
+                  key={entry.id}
+                  entry={entry}
+                  missionStatus={mission?.status ?? null}
+                  onVerified={handleRowVerified}
+                />
               ))}
             </ul>
           )}
@@ -354,19 +404,72 @@ export default function Evaluation() {
           above is AI Analysis, everything below is the human's own
           Business Decision. AI advises, human decides. */}
       {mission && (
-        <BusinessDecisionPanel mission={mission} onDecisionRecorded={setMission} />
+        <BusinessDecisionPanel
+          mission={mission}
+          blockingRowCount={blockingRows.length}
+          onDecisionRecorded={setMission}
+        />
       )}
     </div>
   );
 }
 
-function MatrixRow({ entry }: { entry: MergedEntry }) {
+function MatrixRow({
+  entry,
+  missionStatus,
+  onVerified,
+}: {
+  entry: MergedEntry;
+  missionStatus: MissionRead["status"] | null;
+  onVerified: (updated: ComplianceMatrixEntryRead) => void;
+}) {
   // The signature evidence trail (DESIGN_SYSTEM.md §10): Recommendation
   // (the row itself) -> Evidence -> Source Clause -> Company Document.
   // Each step only renders if the backend actually resolved it -- no
   // placeholder text stands in for a step that isn't real, per "evidence
   // First" (PRODUCT_CONSTITUTION.md §7): every claim here is traceable.
   const hasTrail = Boolean(entry.supporting_evidence || entry.source_page != null || entry.evidence_source);
+
+  // Verification state is local to the row, not lifted to the page --
+  // deliberately mirrors the independent, uncoupled <details> pattern the
+  // evidence trail above already uses. Nothing coordinates which row's
+  // form is open because nothing needs to; multiple rows can be mid-verify
+  // at once with zero shared state.
+  const { notify } = useToast();
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<VerificationDecision>("verified_compliant");
+  const [draftNote, setDraftNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Gated on mission lifecycle, not just requires_verification -- once a
+  // mission is no longer awaiting_approval, the backend already rejects
+  // further verification (approval_service.py's AWAITING_APPROVAL check),
+  // so showing an action that can only 409 would be misleading.
+  const canVerify = entry.requires_verification && missionStatus === "awaiting_approval";
+  const isVerified = entry.verification_status !== "pending";
+
+  const openForm = () => {
+    setDraftStatus("verified_compliant");
+    setDraftNote("");
+    setIsVerifying(true);
+  };
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    try {
+      const updated = await verifyComplianceRow(entry.id, {
+        verification_status: draftStatus,
+        note: draftNote.trim() || null,
+      });
+      onVerified(updated);
+      notify("success", "Compliance row verified.");
+      setIsVerifying(false);
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <li className="px-6 py-3.5 text-sm">
@@ -412,6 +515,68 @@ function MatrixRow({ entry }: { entry: MergedEntry }) {
       {entry.notes && entry.notes !== entry.heading && (
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{entry.notes}</p>
       )}
+
+      {canVerify && (
+        <div className="mt-2">
+          {isVerified ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge value={entry.verification_status} withIcon />
+              {entry.verified_by_name && (
+                <span className="text-muted-foreground">
+                  Verified by {entry.verified_by_name}
+                  {entry.verified_at && ` · ${new Date(entry.verified_at).toLocaleString()}`}
+                </span>
+              )}
+              <button type="button" onClick={openForm} className="text-brand-accent hover:underline">
+                Change verification
+              </button>
+            </div>
+          ) : !isVerifying ? (
+            <button
+              type="button"
+              onClick={openForm}
+              className="inline-flex items-center gap-1 text-xs font-medium text-brand-accent hover:underline"
+            >
+              <ShieldCheck size={12} />
+              Verify
+            </button>
+          ) : (
+            <div className="space-y-2 border-l-2 border-border pl-3">
+              <div className="flex flex-wrap gap-2">
+                {VERIFY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setDraftStatus(opt.value)}
+                    className={cn(
+                      "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                      draftStatus === opt.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-surface hover:bg-surface-hover"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                placeholder="Note (optional)"
+                value={draftNote}
+                onChange={(e) => setDraftNote(e.target.value)}
+                rows={2}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setIsVerifying(false)} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleConfirm} loading={saving}>
+                  Confirm
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -428,9 +593,11 @@ const DECISION_OPTIONS: { value: BusinessDecision; label: string; icon: typeof C
 
 function BusinessDecisionPanel({
   mission,
+  blockingRowCount,
   onDecisionRecorded,
 }: {
   mission: MissionRead;
+  blockingRowCount: number;
   onDecisionRecorded: (mission: MissionRead) => void;
 }) {
   const { notify } = useToast();
@@ -439,7 +606,6 @@ function BusinessDecisionPanel({
   const [saving, setSaving] = useState(false);
 
   const alreadyDecided = mission.status === "completed";
-  const canDecide = mission.status === "awaiting_approval";
 
   const handleSave = async () => {
     if (!selected) return;
@@ -474,11 +640,19 @@ function BusinessDecisionPanel({
             This mission is already completed. Re-run the evaluation above if the underlying evidence has
             changed and a new decision is needed.
           </p>
-        ) : !canDecide ? (
+        ) : mission.status !== "awaiting_approval" ? (
           <p className="text-sm text-muted-foreground">
             A decision can only be recorded once a recommendation exists and the mission is awaiting approval
             (current status: {mission.status}).
           </p>
+        ) : blockingRowCount > 0 ? (
+          <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-soft px-3 py-2.5 text-sm text-warning">
+            <AlertOctagon size={16} className="shrink-0 mt-0.5" />
+            <span>
+              {blockingRowCount} item{blockingRowCount === 1 ? "" : "s"} in the Compliance Matrix above must be
+              verified before you can save a decision — look for the "Verify" action on each flagged row.
+            </span>
+          </div>
         ) : (
           <>
             <div className="flex flex-wrap gap-2">

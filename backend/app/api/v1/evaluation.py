@@ -39,11 +39,13 @@ def _build_response(db: Session, recommendation, compliance_rows, requirements_b
     # with model_copy(update=...) rather than passed into model_validate(),
     # since neither lives on the ComplianceMatrix ORM row itself.
     evidence_sources = decision_service.resolve_evidence_sources(db, compliance_rows)
+    verifier_names = decision_service.resolve_verifier_names(db, compliance_rows)
     compliance_matrix = [
         ComplianceMatrixEntryRead.model_validate(row).model_copy(
             update={
                 "source_page": requirements_by_id[row.requirement_id].source_page,
                 "evidence_source": evidence_sources.get(row.evidence_reference),
+                "verified_by_name": verifier_names.get(row.verified_by),
             }
         )
         for row in compliance_rows

@@ -33,7 +33,7 @@ from app.schemas.approval import (
 )
 from app.schemas.decision import ComplianceMatrixEntryRead, RecommendationRead
 from app.schemas.mission import MissionRead
-from app.services import approval_service
+from app.services import approval_service, decision_service
 from app.services.exceptions import ConflictError, NotFoundError
 
 compliance_router = APIRouter(prefix="/compliance", tags=["approval"])
@@ -56,7 +56,10 @@ def verify_compliance_row(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    return ComplianceMatrixEntryRead.model_validate(row)
+    verifier_names = decision_service.resolve_verifier_names(db, [row])
+    return ComplianceMatrixEntryRead.model_validate(row).model_copy(
+        update={"verified_by_name": verifier_names.get(row.verified_by)}
+    )
 
 
 @approval_router.post("", response_model=MissionRead)

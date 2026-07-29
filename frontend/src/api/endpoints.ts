@@ -3,6 +3,7 @@ import type {
   ApprovalDecisionRequest,
   ApprovalHistoryResponse,
   CapabilityGraphResponse,
+  ComplianceMatrixEntryRead,
   CompanyRead,
   DocumentRead,
   EvaluationResponse,
@@ -14,6 +15,7 @@ import type {
   TenderWithRequirements,
   TokenResponse,
   UserRead,
+  VerifyComplianceRequest,
 } from "./types";
 
 // --- auth ---
@@ -153,3 +155,12 @@ export const recordDecision = (payload: ApprovalDecisionRequest) =>
 
 export const getApprovalHistory = (missionId: string) =>
   apiClient.get<ApprovalHistoryResponse>(`/api/v1/approval/${missionId}`).then((r) => r.data);
+
+// Atomic-layer override (CORE_ARCHITECTURE.md §7): a human verifying or
+// rejecting one compliance row, independent of the mission-level Business
+// Decision above. Returns the updated row so the caller can merge it back
+// into local state without a full page refetch.
+export const verifyComplianceRow = (complianceId: string, payload: VerifyComplianceRequest) =>
+  apiClient
+    .post<ComplianceMatrixEntryRead>(`/api/v1/compliance/${complianceId}/verify`, payload)
+    .then((r) => r.data);
