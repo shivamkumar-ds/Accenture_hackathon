@@ -73,3 +73,18 @@ surfaced it, what it is, why it wasn't just done anyway.
   human-friendly label map, identical to how `TenderDetail.tsx` already did
   this before deletion. Carried over unchanged rather than improved, since
   Phase 4's scope is the merge, not new copy polish.
+
+## Tender Assessment Redesign Review
+
+- **Rename `Reports` page** — raised while reviewing
+  `docs/TENDER_ASSESSMENT_REDESIGN.md`. "Reports" no longer describes what
+  the page does post-Phase-5 (a browse/index over evaluated tenders, not a
+  reporting module). "Tender Library" was preferred over "Completed
+  Assessments" specifically because the page's own filter logic
+  (`reportable = missions.filter(m => m.recommendation_id)`,
+  `Reports.tsx`) deliberately includes `awaiting_approval` missions, not
+  just `completed` ones — "Completed Assessments" would reintroduce the
+  exact wrong implication an earlier fix removed. Not implemented here:
+  out of scope for the Tender Assessment redesign document, which covers
+  the mission page only, not `Reports.tsx`. Revisit if/when Reports itself
+  gets its own design pass.

@@ -158,8 +158,8 @@ exists on the page today:
 | Tier | Question | Absorbs (today) | Status |
 |---|---|---|---|
 | **The Assessment** | Should we bid? | Hero ("AI Recommendation"), "Can we bid?", "Should we bid?" | Merge into one block |
-| **Why** | Why did we reach that? | "What's Blocking This Bid," gap reasons | Transform — grouped by category, consequence-first |
-| **Can This Change** | Is this fixable? | "What Would Change This Recommendation?" | Transform — merged into Why per blocker, plus Administrative/Structural split |
+| **Why** | Why did we reach that? | "What's Blocking This Bid," gap reasons | Transform — grouped by category, ranked by severity, consequence-first |
+| **What Would It Take** | What would it take to change this? | "What Would Change This Recommendation?" | Transform — merged into Why per blocker, plus Administrative/Structural split |
 | **What Should We Do** | What happens next? | Business Decision panel | Kept, but visually the destination — not another card of equal weight |
 | **Evidence** | Where's the proof? | Compliance Summary tiles, Compliance Matrix, confidence breakdown | Collapse — one disclosure, closed by default |
 
@@ -171,8 +171,23 @@ inside one block, preserving the real architectural distinction between
 them (`blockingIssues` vs. `blockingRows` in the current implementation)
 without needing two separate full-width sections to do it. Overall
 confidence appears here twice — as a small number for scanning, and in
-the wording of the sentence itself for reading. This tier alone should
-satisfy the 5-second and 15-second marks in §6 for a clear-cut case.
+the wording of the sentence itself for reading.
+
+A fourth line belongs here, added in review: a single grounded business-
+consequence sentence — e.g. "Submitting this tender today is likely to
+fail technical qualification due to mandatory eligibility gaps." Not a
+fifth independent fact; it's a synthesis of whichever blocker ranks #1 by
+severity in Why (see below), so the Assessment and Why tell one continuous
+story instead of two separately-written summaries. It must be
+`recommendation_type`-aware, same discipline as the opening claim: hard
+disqualification language is only accurate for a genuine mandatory-
+eligibility No-Go. A Conditional or risk-driven No-Go needs softer
+language ("proceeding without addressing the flagged risk areas increases
+the likelihood of an unfavorable outcome") — grounded consequence, not a
+uniform template applied regardless of what actually drove the verdict.
+
+This tier alone should satisfy the 5-second and 15-second marks in §6 for
+a clear-cut case.
 
 **Why** groups every mandatory-and-not-met gap by its `requirement_type`
 category, and each group carries its plain-language consequence, not just
@@ -180,11 +195,38 @@ its status — "Technical: 1 requirement unmet — this would likely be
 screened out before evaluation," not a bare badge. This is where the two
 currently-duplicated blocker sections become one.
 
-**Can This Change** answers a genuinely different question than Why —
-diagnosis versus prognosis — which is why it stays a distinct tier rather
-than folding fully into Why. Administrative-versus-structural framing
-lives here, restated per §3's honesty flag: a static category label, not
-a computed score, and never phrased as a percentage or probability.
+Within Why, blockers are ranked by severity, not just grouped — a "Top
+Priorities" ordering added in review, because grouping alone still leaves
+the reader to work out which of nine blockers actually matters most, and
+the AI already knows: every `ComplianceMatrixEntryRead` carries a real
+`risk_level` (critical/high/medium/low), joined to its `GapAnalysisEntry`
+by `requirement_id` — an exact ID join already used elsewhere
+(`mergeRequirementContext`), not fuzzy matching. Ranking critical before
+high before medium before low is reusing an existing severity signal for
+a new purpose, not new inference. A blocker with no resolvable
+`risk_level` falls back to unranked position rather than being assigned
+one — no fabricated severity where the data doesn't have it. This ranking
+is a distinct signal from Administrative/Structural below and must not be
+collapsed into one label per blocker: severity (how bad) and fixability
+(how changeable) are different questions, and a blocker can be any
+combination of the two — severe-but-fixable and minor-but-structural are
+both real, meaningful states that a single blended label would erase.
+
+**What Would It Take** (renamed in review from "Can This Change" — the
+original name was AI-centric; this is the executive's actual question)
+answers a genuinely different question than Why — diagnosis versus
+prognosis — which is why it stays a distinct tier rather than folding
+fully into Why. Administrative-versus-structural framing lives here,
+restated per §3's honesty flag: a static category label, not a computed
+score, and never phrased as a percentage or probability. The tier name is
+deliberately broader than "Path to Eligibility" (considered and rejected
+in review): that phrasing fits a hard eligibility-driven No-Go well but
+doesn't fit a Conditional recommendation (already eligible, the question
+is de-risking) or a Review recommendation (the question is what would
+resolve the AI's own uncertainty, not eligibility at all). "Path to
+Eligibility" can still be the language used *inside* this tier
+specifically for the eligibility-failure case; it isn't accurate as the
+tier's universal name across all four `recommendation_type` values.
 
 **What Should We Do** is unchanged in content from the current Business
 Decision panel (condensed recap, Proceed/Rejected/Needs Changes, finality
@@ -219,8 +261,25 @@ nothing above should be read as approved until it passes this check.
 - The merged Assessment block — pure presentation over
   `recommendation.recommendation_type`, `risk_level`, `overall_confidence`,
   and the existing `blockingIssues` count. No new fields.
+- The Assessment block's consequence sentence — a synthesis of the #1
+  ranked blocker (see below), templated per `recommendation_type` so hard
+  disqualification language is only used where a genuine mandatory-
+  eligibility failure drove the verdict. Grounded specifically because
+  "mandatory" is the tender's own stated rule, not BidOps's guess at the
+  buyer's process — see the rejected item below for the line this must
+  not cross.
 - Blocker grouping by `requirement_type` — the field already exists on
   every `GapAnalysisEntry`.
+- Severity ranking of blockers ("Top Priorities," added in review) — every
+  `ComplianceMatrixEntryRead` already carries `risk_level`
+  (critical/high/medium/low), joined to its `GapAnalysisEntry` by the
+  existing `requirement_id` key. Reusing an existing severity signal for a
+  new purpose, not new inference. Missing `risk_level` falls back to
+  unranked, never a fabricated value. Implementation note, not a design
+  gap: the current merge helper (`mergeRequirementContext`) doesn't carry
+  the gap's `reason` text through today, so ranking blockers with their
+  explanation intact needs a small additive join at implementation time —
+  flagged here so it isn't rediscovered as a surprise later.
 - "This would likely be screened out before evaluation" and similar
   consequence framing for mandatory-and-not-met requirements — a
   restatement of what "mandatory, not met" already means, the same move
@@ -228,7 +287,11 @@ nothing above should be read as approved until it passes this check.
 - Administrative/Structural classification — a static, human-authored
   mapping from the seven `RequirementType` values, computed once, not
   per-tender, not AI-generated. Needs product sign-off as a mapping (like
-  `RECOMMENDATION_LABELS`), not treated as self-evidently correct.
+  `RECOMMENDATION_LABELS`), not treated as self-evidently correct. Kept
+  deliberately separate from severity ranking above — fixability and
+  severity are different questions, and collapsing them into one label
+  per blocker would erase real, meaningful combinations (severe-but-
+  fixable, minor-but-structural).
 - Review/Conditional calibrated framing — driven entirely by
   `recommendation_type` and `overall_confidence`, both already present.
 
@@ -241,7 +304,11 @@ nothing above should be read as approved until it passes this check.
 - Any claim about the tender issuer's internal review process (e.g. "human
   review is unlikely"). BidOps has no visibility into that process. Any
   consequence statement must describe what happens to *our submission*
-  based on facts we hold, never speculate about the buyer's process.
+  based on facts we hold, never speculate about the buyer's process. This
+  is the exact line the Assessment consequence sentence above must not
+  cross: "likely to fail technical qualification" reads back the tender's
+  own stated eligibility rule; "human review is unlikely" would claim
+  knowledge of a process we can't see.
 - Any monetary or strategic "Business Impact" framing (deal size,
   strategic priority). No such field exists on `TenderRead` today. If this
   becomes real later, it needs a real data source — either captured at
@@ -257,8 +324,8 @@ to hit:
 - **5–15 seconds:** the dominant reason. Whether it's a hard eligibility
   failure or a risk judgment, stated in the same block, not requiring a
   scroll.
-- **15–30 seconds:** whether it's fixable, and roughly how (Can This
-  Change), plus what to do about it (What Should We Do) — both visible
+- **15–30 seconds:** whether it's fixable, and roughly how (What Would It
+  Take), plus what to do about it (What Should We Do) — both visible
   without opening the Evidence disclosure.
 - **30+ seconds:** everything past this point is opened deliberately, not
   scrolled past involuntarily. If a reader never opens Evidence, they
@@ -280,20 +347,36 @@ to hit:
   Assessment" rename proposed in §3 is compatible with it, not a
   replacement of it.
 
-## 8. Open Items for Review
+## 8. Review Log
 
-- Confirm or reject the "Tender Assessment" rename (§3) — cosmetic, but
-  worth an explicit decision before it's built, same as any vocabulary
-  change.
+**Resolved in review:**
+- "Tender Assessment" rename — confirmed. Diagnostic framing over
+  directive framing, consistent with "AI advises, human decides."
+- Blockers ranked by severity within Why ("Top Priorities"), not just
+  grouped — confirmed, grounded in existing `risk_level`, kept as a
+  distinct signal from Administrative/Structural fixability (§4, §5).
+- "Can This Change" renamed to "What Would It Take" — confirmed.
+  "Path to Eligibility" was considered and rejected as the tier's
+  universal name (too narrow for Conditional/Review cases) but remains
+  valid language *within* the tier for eligibility-driven cases
+  specifically.
+- Assessment block gains a fourth line: a grounded, `recommendation_type`-
+  aware business-consequence sentence, synthesized from the #1-ranked
+  blocker rather than written independently (§4, §5).
+
+**Still open:**
 - Sign off on the Administrative/Structural mapping (§5) as a fixed,
-  reviewable classification — this is the one piece of genuinely new
-  interpretive content in this document and deserves scrutiny before
-  implementation, not silent approval by omission.
+  reviewable classification — the one piece of genuinely new interpretive
+  content in this document, deserves explicit scrutiny before
+  implementation, not approval by omission.
 - Confirm the Evidence tier should be a single unified disclosure (matrix
   + confidence + compliance summary together) rather than three
-  independently-collapsible pieces — this document assumes "one show-your-
-  work action" is stronger than three, but that's a judgment call worth
-  stating explicitly rather than assuming.
+  independently-collapsible pieces.
+
+**Related, not in scope of this document:** renaming Reports (e.g.
+"Tender Library") — raised in review, agreed in direction, but scoped to
+a different page than this document covers. Logged in
+`docs/TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md` instead of folded in here.
 
 ## 9. Next Steps (Not Started)
 
