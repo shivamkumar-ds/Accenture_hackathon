@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { useToast } from "../context/ToastContext";
 import { cn } from "../lib/cn";
 import { LiveClock, Logo, Menu, MenuDivider, MenuItem, Switch } from "./kit";
 
@@ -33,7 +32,6 @@ const navItems = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { notify } = useToast();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -148,10 +146,10 @@ export default function Layout() {
               <div className="px-3.5 py-2 border-b border-border sm:hidden">
                 <Switch checked={theme === "dark"} onChange={toggleTheme} label="Toggle dark mode" />
               </div>
-              <MenuItem icon={<UserCircle size={15} />} onClick={() => notify("info", "Profile view is read-only for now.")}>
+              <MenuItem icon={<UserCircle size={15} />} onClick={() => navigate("/profile")}>
                 Profile
               </MenuItem>
-              <MenuItem icon={<Settings size={15} />} onClick={() => notify("info", "Settings isn't available yet.")}>
+              <MenuItem icon={<Settings size={15} />} onClick={() => navigate("/settings")}>
                 Settings
               </MenuItem>
               <MenuDivider />

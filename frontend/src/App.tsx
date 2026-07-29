@@ -11,6 +11,8 @@ import Capabilities from "./pages/Capabilities";
 import TenderUpload from "./pages/TenderUpload";
 import Missions from "./pages/Missions";
 import Evaluation from "./pages/Evaluation";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { isAuthenticated } = useAuth();
@@ -44,6 +46,8 @@ function AppRoutes() {
         <Route path="/tenders/new" element={<TenderUpload />} />
         <Route path="/missions" element={<Missions />} />
         <Route path="/missions/:missionId" element={<Evaluation />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
         {/* Reports.tsx retired -- it was a strictly smaller, less capable
             duplicate view over the same list_missions() data Tender
             Workspace already fully contains (Tender Workspace already
