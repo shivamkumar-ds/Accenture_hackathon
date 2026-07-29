@@ -1183,8 +1183,18 @@ function BusinessDecisionPanel({
     }
   };
 
+  // docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 5 -- "What Should
+  // We Do" is unchanged in content from the panel that existed before this
+  // phase (redesign doc §4: same recap, same Proceed/Rejected/Needs
+  // Changes options, same finality copy); only its visual weight changes,
+  // so it reads as the page's destination rather than another card of
+  // equal weight to the four tiers above it. Reuses the existing
+  // border-primary/30 + bg-primary/[0.03] treatment already established
+  // for "the destination" card elsewhere on this page (the "Ready for
+  // Decision Engine" card in the Requirements section) -- no new color or
+  // component added to the design system, per §7's explicit constraint.
   return (
-    <Card>
+    <Card className="border-primary/30 bg-primary/[0.03] shadow-hero">
       <CardHeader title="Business Decision" description="AI advises. You decide." />
       <CardBody className="space-y-4">
         {alreadyDecided ? (
