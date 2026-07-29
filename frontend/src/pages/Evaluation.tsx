@@ -702,16 +702,6 @@ export default function Evaluation() {
           </p>
         )}
 
-        {/* Confidence breakdown -- stays here for now; moves under the
-            Evidence disclosure in Phase 6
-            (docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md), not deleted and
-            re-added across two phases. */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8 pt-6 border-t border-border">
-          <ConfidenceBar label="Document Confidence" value={recommendation.document_confidence} />
-          <ConfidenceBar label="Entity Confidence" value={recommendation.entity_confidence} />
-          <ConfidenceBar label="Matching Confidence" value={recommendation.matching_confidence} />
-          <ConfidenceBar label="Recommendation Confidence" value={recommendation.recommendation_confidence} />
-        </div>
       </div>
 
       {/* Why -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 3,
@@ -824,84 +814,118 @@ export default function Evaluation() {
         />
       )}
 
-      {/* Supporting Evidence -- Compliance Summary + Compliance Matrix,
-          grouped together and demoted below the decision
-          (docs/TENDER_JOURNEY_DESIGN.md §3). Not required reading for the
-          executive path above; this is where the analyst/compliance
-          officer verifies individual claims. */}
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Supporting Evidence</p>
+      {/* Evidence -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 6,
+          docs/TENDER_ASSESSMENT_REDESIGN.md §4/§8. One closed-by-default
+          disclosure, not three independently-collapsible pieces: the
+          confidence breakdown (moved here from the Assessment block
+          above), the Compliance Summary tiles, and the Compliance Matrix
+          all live inside it. Every one of these answers the same
+          underlying question -- "why should I trust this assessment?" --
+          so they're one answer with internal structure, per §2's "no
+          duplicate summaries" principle. Native <details> (uncontrolled,
+          closed on load, same pattern MatrixRow already uses for its own
+          "View evidence trail") -- opening it triggers no fetch, all of
+          this data is already in `data` from refresh() above.
 
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Compliance Summary</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatusStat label="Met" status="met" count={statusCount(compliance_matrix, "met")} />
-          <StatusStat label="Not Met" status="not_met" count={statusCount(compliance_matrix, "not_met")} />
-          <StatusStat label="Review Required" status="review_required" count={statusCount(compliance_matrix, "review_required")} />
-          <StatusStat label="Conditional" status="conditional" count={statusCount(compliance_matrix, "conditional")} />
-        </div>
-      </div>
+          Not the same thing as Decision History further below: the
+          Compliance Matrix rows here carry row-level verification
+          provenance (verified_by_name / verified_at per row); Decision
+          History is the mission-level Business Decision audit trail. The
+          redesign doc is explicit that the two must not merge. */}
+      <details className="group rounded-xl border border-border bg-surface">
+        <summary className="flex items-center justify-between gap-3 px-6 py-4 cursor-pointer select-none list-none hover:bg-surface-hover transition-colors rounded-xl">
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <ShieldCheck size={15} className="text-muted-foreground" />
+            Evidence
+          </span>
+          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            Why should I trust this assessment?
+            <ChevronDown size={15} className="transition-transform group-open:rotate-180" />
+          </span>
+        </summary>
 
-      {/* Compliance matrix -- grouped by status instead of one long flat
-          scroll, requirement text leads every row, raw matched evidence is
-          tucked behind a "View evidence" disclosure instead of printed in
-          full for every single row. */}
-      <Card>
-        <CardHeader
-          title="Compliance Matrix"
-          description={`${filtered.length} of ${compliance_matrix.length} requirements · supporting evidence per row`}
-          action={<SearchInput value={query} onChange={setQuery} placeholder="Search requirements…" />}
-        />
-        <CardBody>
-          <div className="flex flex-wrap gap-2 mb-2">
-            <FilterChip label="All" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
-            {STATUS_ORDER.map((s) => (
-              <FilterChip key={s} label={STATUS_COPY[s]} active={statusFilter === s} onClick={() => setStatusFilter(s)} />
-            ))}
+        <div className="px-6 pb-6 pt-4 space-y-6 border-t border-border">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <ConfidenceBar label="Document Confidence" value={recommendation.document_confidence} />
+            <ConfidenceBar label="Entity Confidence" value={recommendation.entity_confidence} />
+            <ConfidenceBar label="Matching Confidence" value={recommendation.matching_confidence} />
+            <ConfidenceBar label="Recommendation Confidence" value={recommendation.recommendation_confidence} />
           </div>
 
-          {statusFilter === "all" ? (
-            <div className="-mx-6 divide-y divide-border">
-              {STATUS_ORDER.filter((s) => grouped[s].length > 0).map((status) => (
-                <div key={status}>
-                  <button
-                    onClick={() => setExpanded((prev) => ({ ...prev, [status]: !prev[status] }))}
-                    className="w-full flex items-center justify-between gap-3 px-6 py-3 text-sm font-medium hover:bg-surface-hover transition-colors"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Badge value={status} withIcon />
-                      <span className="text-muted-foreground font-normal">{grouped[status].length} requirement(s)</span>
-                    </span>
-                    <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", expanded[status] && "rotate-180")} />
-                  </button>
-                  {expanded[status] && (
-                    <ul className="divide-y divide-border bg-muted/30">
-                      {grouped[status].map((entry) => (
-                        <MatrixRow
-                          key={entry.id}
-                          entry={entry}
-                          missionStatus={mission?.status ?? null}
-                          onVerified={handleRowVerified}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Compliance Summary</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatusStat label="Met" status="met" count={statusCount(compliance_matrix, "met")} />
+              <StatusStat label="Not Met" status="not_met" count={statusCount(compliance_matrix, "not_met")} />
+              <StatusStat label="Review Required" status="review_required" count={statusCount(compliance_matrix, "review_required")} />
+              <StatusStat label="Conditional" status="conditional" count={statusCount(compliance_matrix, "conditional")} />
             </div>
-          ) : (
-            <ul className="divide-y divide-border -mx-6">
-              {filtered.map((entry) => (
-                <MatrixRow
-                  key={entry.id}
-                  entry={entry}
-                  missionStatus={mission?.status ?? null}
-                  onVerified={handleRowVerified}
-                />
-              ))}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
+          </div>
+
+          {/* Compliance matrix -- grouped by status instead of one long flat
+              scroll, requirement text leads every row, raw matched evidence
+              is tucked behind a "View evidence" disclosure instead of
+              printed in full for every single row. Unchanged from before
+              Phase 6 except its container. */}
+          <Card>
+            <CardHeader
+              title="Compliance Matrix"
+              description={`${filtered.length} of ${compliance_matrix.length} requirements · supporting evidence per row`}
+              action={<SearchInput value={query} onChange={setQuery} placeholder="Search requirements…" />}
+            />
+            <CardBody>
+              <div className="flex flex-wrap gap-2 mb-2">
+                <FilterChip label="All" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
+                {STATUS_ORDER.map((s) => (
+                  <FilterChip key={s} label={STATUS_COPY[s]} active={statusFilter === s} onClick={() => setStatusFilter(s)} />
+                ))}
+              </div>
+
+              {statusFilter === "all" ? (
+                <div className="-mx-6 divide-y divide-border">
+                  {STATUS_ORDER.filter((s) => grouped[s].length > 0).map((status) => (
+                    <div key={status}>
+                      <button
+                        onClick={() => setExpanded((prev) => ({ ...prev, [status]: !prev[status] }))}
+                        className="w-full flex items-center justify-between gap-3 px-6 py-3 text-sm font-medium hover:bg-surface-hover transition-colors"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Badge value={status} withIcon />
+                          <span className="text-muted-foreground font-normal">{grouped[status].length} requirement(s)</span>
+                        </span>
+                        <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", expanded[status] && "rotate-180")} />
+                      </button>
+                      {expanded[status] && (
+                        <ul className="divide-y divide-border bg-muted/30">
+                          {grouped[status].map((entry) => (
+                            <MatrixRow
+                              key={entry.id}
+                              entry={entry}
+                              missionStatus={mission?.status ?? null}
+                              onVerified={handleRowVerified}
+                            />
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ul className="divide-y divide-border -mx-6">
+                  {filtered.map((entry) => (
+                    <MatrixRow
+                      key={entry.id}
+                      entry={entry}
+                      missionStatus={mission?.status ?? null}
+                      onVerified={handleRowVerified}
+                    />
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+      </details>
               </div>
             );
           })()
