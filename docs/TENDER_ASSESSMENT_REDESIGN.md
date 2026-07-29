@@ -1,6 +1,9 @@
 # Tender Assessment — Information Architecture Redesign (Frozen)
 
-Status: **Frozen — design complete, implementation not started.** Reached
+Status: **Frozen — implemented.** See
+`docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md` for the 6-phase
+implementation record (all phases complete, no backend change required).
+This document itself remains frozen — reached
 through the same discussion-first discipline as `TENDER_JOURNEY_DESIGN.md`
 (Discussion → Review → Approval → Freeze, `ENGINEERING_DIRECTIVE.md`
 §"Post-Architecture Phase"). Grows directly out of
@@ -418,11 +421,10 @@ including the further observation that "Tender Workspace" and "Tender
 Library" would read as a coherent pair in navigation in a way "Tender
 Workspace" and "Reports" currently don't.
 
-## 9. Next Steps (Not Started)
+## 9. Next Steps — Implemented
 
 This document is frozen; no further design iteration is planned for it.
-A new implementation plan needs to be written against it when
-implementation resumes — phased, reviewed, and approved the same way the
-seven Tender Journey phases were, starting from the current frozen
-implementation rather than from scratch. No implementation plan exists
-yet. No code has been written against this document.
+`docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md`, written against this
+document, is now fully implemented across 6 phases — see that document's
+phase→commit table. No backend, API, or schema change was required for
+any phase.

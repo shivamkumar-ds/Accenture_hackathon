@@ -65,8 +65,8 @@ when working on that feature again, not general-purpose reference.
 | `TENDER_JOURNEY_DESIGN.md` | Tender Journey & Business Decision experience design (frozen, implemented) — the frontend product philosophy for the mission lifecycle |
 | `TENDER_JOURNEY_IMPLEMENTATION_PLAN.md` | Tender Journey implementation plan (implemented — all 7 phases complete) — derived from the design doc above |
 | `TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md` | Append-only log of ideas/interpretations that surfaced during the 7-phase implementation but weren't built, per its own scope-discipline rule |
-| `TENDER_ASSESSMENT_REDESIGN.md` | Tender Assessment information architecture redesign (frozen, implementation not started) — supersedes `TENDER_JOURNEY_DESIGN.md` §3's page hierarchy specifically, after using the finished implementation end to end |
-| `TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md` | Tender Assessment implementation plan (proposed, awaiting review) — 6 phases derived strictly from the redesign doc above, no backend changes required |
+| `TENDER_ASSESSMENT_REDESIGN.md` | Tender Assessment information architecture redesign (frozen, implemented) — supersedes `TENDER_JOURNEY_DESIGN.md` §3's page hierarchy specifically, after using the finished implementation end to end |
+| `TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md` | Tender Assessment implementation plan (implemented — all 6 phases complete) — derived strictly from the redesign doc above, no backend changes required |
 
 ## Audit reports
 

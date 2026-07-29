@@ -1,9 +1,21 @@
-# Tender Assessment — Implementation Plan (No Code)
+# Tender Assessment — Implementation Plan
 
-Status: **Proposed — awaiting review. No frontend code has been changed
-by this document.** Derived strictly from `docs/TENDER_ASSESSMENT_REDESIGN.md`
-(frozen). Nothing below introduces a product idea not already recorded
-there — anything that surfaces during implementation gets logged in
+Status: **Implemented — all 6 phases complete.** Derived strictly from
+`docs/TENDER_ASSESSMENT_REDESIGN.md` (frozen). Nothing implemented
+introduced a product idea not already recorded there. All six phases
+landed as their own reviewed, verified, atomic commit, in order, with no
+backend/API/schema change and no architecture-conflict pause triggered:
+
+| Phase | Commit | What |
+|---|---|---|
+| 1 | `78bd193` | Foundation — severity ranking, Administrative/Structural mapping, `reason` threaded through the merge |
+| 2 | `3a0c0f7` | The Assessment — merged hero/"Can we bid?"/"Should we bid?", added the consequence line |
+| 3 | `01f83b0` | Why — grouped, severity-ranked blockers |
+| 4 | `79f453a` | What Would It Take — renamed tier, Administrative/Structural labels |
+| 5 | `e33d828` | What Should We Do — Business Decision panel visual weight |
+| 6 | `7eab41c` | Evidence — single closed-by-default disclosure |
+
+Anything that surfaced during implementation gets logged in
 `docs/TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md` (kept as the single
 running log across both the Tender Journey and Tender Assessment work,
 rather than forked into a second file) instead of folded into scope
