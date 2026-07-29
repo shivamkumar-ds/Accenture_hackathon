@@ -51,7 +51,7 @@ export default function Reports() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Every evaluated tender's AI Recommendation -- open one to review it or download its PDF report.
+          Every evaluated tender's Tender Assessment -- open one to review it or download its PDF report.
         </p>
       </div>
 

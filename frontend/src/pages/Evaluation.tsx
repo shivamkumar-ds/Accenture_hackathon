@@ -468,7 +468,7 @@ export default function Evaluation() {
       <div className="flex gap-2">
         <FilterChip label="Requirements" active={section === "requirements"} onClick={() => setSection("requirements")} />
         <FilterChip
-          label="AI Recommendation"
+          label="Tender Assessment"
           active={section === "recommendation"}
           onClick={() => setSection("recommendation")}
         />
@@ -1248,7 +1248,7 @@ function BusinessDecisionPanel({
                 TENDER_JOURNEY_DESIGN.md §3). */}
             <div className="rounded-md border border-border bg-muted/30 px-3.5 py-3 text-sm space-y-1">
               <p>
-                <span className="text-muted-foreground">AI Recommendation: </span>
+                <span className="text-muted-foreground">Tender Assessment: </span>
                 <span className="font-medium">{recommendationLabel(recommendation.recommendation_type)}</span>
               </p>
               <p>
