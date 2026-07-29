@@ -22,6 +22,12 @@ export function mergeRequirementContext(matrix: ComplianceMatrixEntryRead[], gap
       heading: gap?.description ?? entry.notes ?? "Requirement detail unavailable.",
       requirementType: gap?.requirement_type ?? null,
       mandatory: gap?.mandatory ?? null,
+      // Additive (docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 1) --
+      // gap_analysis's own forward-looking/retrospective reason text,
+      // threaded through so the Why/What-Would-It-Take tiers can render it
+      // without a second lookup. Existing consumers (Reports.tsx/
+      // pdfReport.ts) ignore unknown fields, so this is safe for them.
+      reason: gap?.reason ?? null,
     };
   });
 }
