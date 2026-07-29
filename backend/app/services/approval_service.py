@@ -17,14 +17,14 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog, ComplianceMatrix, Mission, Recommendation
-from app.models.enums import ComplianceMatrixVerificationStatus, MissionStatus, RecommendationType, RiskLevel
+from app.models.enums import BusinessDecision, ComplianceMatrixVerificationStatus, MissionStatus, RiskLevel
 from app.services.exceptions import ConflictError, NotFoundError
 
 APPROVAL_AGENT = "human_approval_layer"
 
-# Only these decisions end a mission — REVIEW deliberately does not,
-# since its entire purpose is "send this back for further work."
-TERMINAL_DECISIONS = {RecommendationType.GO, RecommendationType.CONDITIONAL_GO, RecommendationType.NO_GO}
+# Only these decisions end a mission — NEEDS_REVISION deliberately does
+# not, since its entire purpose is "send this back for further work."
+TERMINAL_DECISIONS = {BusinessDecision.PROCEED, BusinessDecision.REJECTED}
 
 # Only rows both flagged for verification AND at HIGH/CRITICAL risk block
 # a decision — per the approved refinement, MEDIUM/LOW verification stays
@@ -111,7 +111,7 @@ def verify_compliance_row(
 
 def record_decision(
     db: Session, mission_id: uuid.UUID, company_id: uuid.UUID, user_id: uuid.UUID,
-    decision: RecommendationType, reason: str | None,
+    decision: BusinessDecision, reason: str | None,
 ) -> Mission:
     mission = mission_service.get_mission(db, mission_id, company_id)
 
@@ -138,7 +138,7 @@ def record_decision(
     if decision in TERMINAL_DECISIONS:
         mission.status = MissionStatus.COMPLETED
         mission.completed_at = datetime.now(timezone.utc)
-    # REVIEW: mission deliberately stays AWAITING_APPROVAL — not terminal.
+    # NEEDS_REVISION: mission deliberately stays AWAITING_APPROVAL — not terminal.
 
     db.commit()
     db.refresh(mission)

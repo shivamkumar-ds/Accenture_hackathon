@@ -1,6 +1,14 @@
 # Bid Decision — Design Proposal (V1)
 
-Status: **Proposed, not implemented.** No code changes accompany this document.
+Status: **Implemented (Phase B).** §4, §5, §6, and §7 below were revised
+during implementation after discovering `approval_service.record_decision`
+(the existing Human Approval Layer, `POST /approval`) already implements
+most of this contract — built earlier, before this design conversation
+happened, and never connected back to it. Rather than build a second,
+parallel code path for the same business action, this feature extends that
+existing mechanism instead of introducing the new endpoint originally
+proposed below. The product contract, page layout, and out-of-scope list
+are otherwise unchanged from the original proposal.
 
 (Previously named "Decision Review." Renamed because users are making a
 decision, not reviewing one — the button that launches this page is "Make
@@ -108,41 +116,64 @@ the authenticated session, not entered), history timeline, task list.
 
 ## 4. API Contract
 
-One new endpoint, no new tables:
+No new endpoint, no new tables. Bid Decision is the UI in front of the
+existing Human Approval Layer (`app/services/approval_service.py`,
+`app/api/v1/approval.py`), which already implemented this exact
+read-existing-evaluation / write-one-decision contract before this design
+document existed:
 
 ```
-PATCH /api/v1/missions/{mission_id}/decision
+POST /api/v1/approval
 
 Request body:
 {
+  "mission_id": uuid,
   "decision": "proceed" | "rejected" | "needs_revision",
-  "notes": string | null
+  "reason": string | null   // required when decision == "rejected"
 }
 
 Response: MissionRead (existing schema), reflecting the updated
-actual_outcome, outcome_notes, status, and completed_at.
+status and completed_at.
+
+GET /api/v1/approval/{mission_id}
+  -> mission, recommendation, compliance_matrix, decision_events
+  (decision_events is the audit trail — see §6, revised)
 ```
 
-Validation: `decision` is a `Literal` at the Pydantic layer — enforced at
-the API boundary even though the underlying `Mission.actual_outcome` column
-stays an untyped `String` (no migration). Approver identity comes from
-`get_current_user`, not from the request body.
+`decision` is `BusinessDecision` (`app/models/enums.py`) — a vocabulary
+deliberately kept separate from the AI's own `RecommendationType`, so "AI
+recommends" and "human decides" never collapse into one enum. Field is
+named `reason`, not `notes` (the field name that existed in the endpoint
+already; not worth renaming for cosmetic alignment with this doc).
 
-Read side: no new endpoint. The page composes data from the evaluation
-endpoint the Reports page already calls.
+**One guarantee beyond the original proposal:** the write is blocked —
+`409 Conflict`, no partial write — if the mission has an unverified
+HIGH/CRITICAL-risk compliance row. A human can't record Proceed while a
+flagged high-risk item still shows `verification_status: pending`; that
+row must be verified (via `POST /compliance/{id}/verify`) first. This
+wasn't in the original proposal because the proposal didn't know this
+mechanism (and this exact guarantee) already existed.
+
+Authorization: see §7 (revised).
+
+Read side: no new endpoint beyond the existing `GET /approval/{mission_id}`
+above. The page composes the AI-analysis half of its layout from the
+evaluation endpoint the Reports page already calls.
 
 ## 5. State Transitions
 
-| Decision        | `actual_outcome` | `outcome_notes` | `status`             | `completed_at` |
-|------------------|-------------------|-------------------|------------------------|-----------------|
-| `proceed`        | `"proceed"`       | notes or null     | `completed`            | now()           |
-| `rejected`       | `"rejected"`      | notes or null     | `completed`            | now()           |
-| `needs_revision` | `"needs_revision"`| notes or null     | unchanged (`awaiting_approval`) | unchanged |
+| Decision        | `status`                        | `completed_at` | Blocking-row gate applies? |
+|------------------|----------------------------------|-----------------|------------------------------|
+| `proceed`        | `completed`                     | now()           | yes                          |
+| `rejected`       | `completed`                     | now()           | yes                          |
+| `needs_revision` | unchanged (`awaiting_approval`) | unchanged       | yes (still requires the gate to pass, even though the mission isn't finalized) |
 
-`completed` is an existing `MissionStatus` value that nothing in the
-codebase currently transitions to — this finally gives it a real trigger,
-using two fields (`completed_at`, `actual_outcome`) that already existed
-but were never written. No enum change, no migration.
+`completed` is an existing `MissionStatus` value; `record_decision()`
+already transitions to it for terminal decisions and already had this
+logic in place before this design document existed. Every decision —
+terminal or not — is written to `AuditLog` regardless of outcome (see §6,
+revised): `needs_revision` still needs a record of *why*, even though the
+mission stays open.
 
 **Visibility:** `completed` missions (Proceed or Rejected) move out of the
 active Tender Workspace/Dashboard views the same way `archived` ones already
@@ -155,26 +186,44 @@ already was: visible, actionable, `awaiting_approval`.
 
 ## 6. Explicitly Out of Scope for V1
 
-- Decision history / append-only audit log (`mission_decisions` table).
-  Revisit only if usage shows decisions get revised more than once per
-  tender in practice.
+- **Revised:** decision history / audit log is *not* out of scope — it's
+  already implemented, at zero additional schema cost, since every
+  decision is written to the pre-existing `AuditLog` table via
+  `approval_service._log()`. The original exclusion assumed this would
+  require a new `mission_decisions` table; it doesn't, because the
+  mechanism already existed. `GET /approval/{mission_id}` already exposes
+  it as `decision_events`. What's still genuinely out of scope: a
+  dedicated UI timeline/history view for those events — the data exists,
+  the page to browse it doesn't.
+- Structured business-reasoning fields (`business_reason`, `assumptions`,
+  as distinct fields from freeform `reason`). Worth doing later so "why
+  did we proceed" doesn't require parsing one text blob, but not needed
+  for V1 — noted, not built.
 - Decision confidence scoring — no shared rubric exists for what a
   manager's "High" means; collecting it now would produce data with no
   clean interpretation.
 - Fix Gaps & Reanalyse loop, auto-generated action plans, projected score
   changes.
 - Task assignment / notifications / workflow automation.
-- Any new database migration beyond none — this design requires zero
-  schema changes.
+- Any new database migration — this feature required zero schema changes,
+  reusing `Mission.status`/`completed_at` and the existing `AuditLog`
+  table exactly as they already existed.
 
-## 7. Open Question for Product
+## 7. Authorization (resolved)
 
-Who should be allowed to record a Business Decision — any authenticated
-company user, or a specific role (`bid_manager` / `executive`)? The
-codebase already has a precedent for role-gating a sensitive action
-(capability deletion is `require_administrator`-only); Bid Decision
-needs its own explicit answer before the endpoint is built, since it
-determines whether the route needs a role check at all.
+Gated by a permission, not a hardcoded role check inline at the route:
+`require_business_decision_permission` (`app/api/deps.py`), backed by a
+named predicate `user_can_make_business_decision(user) -> bool`. Today
+that predicate is implemented as a flat role check (Executive or
+Administrator — same bootstrap allowance already used by
+`require_approver` for compliance-row verification, so a newly registered
+company doesn't need to create a separate Executive user to complete the
+workflow). The reason for the indirection: role names are not stable
+across customers (a "Bid Manager" at one company may be a "Regional
+Procurement Lead" at another). Every caller — the router, tests — depends
+on the named permission function, never on the role comparison directly,
+so introducing a real `can_make_business_decision` permissions table later
+is a one-function change with no call sites to touch.
 
 ## 8. Future Idea — Not V1, Not V2, Just a Note
 
@@ -190,3 +239,14 @@ Nothing here commits to building it. It's recorded so that if/when reruns
 or a decision history become justified by real usage (see §6), this design
 doesn't have to be undone to support them — the "Business Decision" concept
 was already designed as separable from "Mission Status" from day one.
+
+One more note in the same spirit: a completed decision doesn't currently
+know which version of the evaluation it was made against. If the
+underlying evaluation changes later (corrigendum, an expired certificate,
+updated evidence) a `proceed`/`rejected` decision silently stays
+`completed` with no signal that it was made against now-stale reasoning.
+Not solving this in V1 — but if/when Verdict-level evaluation versioning
+(`docs/CORE_ARCHITECTURE.md` §6) is implemented, linking a Business
+Decision to the Evaluation Version it was made against would let a
+changed evaluation flag the decision as potentially outdated, rather than
+leaving it looking as settled as one made five minutes ago.

@@ -72,8 +72,8 @@ def require_administrator(current_user: User = Depends(get_current_user)) -> Use
 
 def require_approver(current_user: User = Depends(get_current_user)) -> User:
     """
-    Authorization for mission approval decisions. Executive is the
-    intended production approver (per the PRD's role definitions);
+    Authorization for per-Verdict compliance-row overrides. Executive is
+    the intended production approver (per the PRD's role definitions);
     Administrator is also allowed so a newly registered company can
     complete the full workflow without first creating a separate
     Executive user — a deliberate bootstrap/MVP allowance, not an
@@ -83,5 +83,31 @@ def require_approver(current_user: User = Depends(get_current_user)) -> User:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This action requires the Executive or Administrator role.",
+        )
+    return current_user
+
+
+# Permission-shaped authorization for the Bid Decision feature
+# (docs/BID_DECISION_DESIGN.md §7). There is no permissions table in
+# this schema yet, so the permission is backed today by the same flat
+# role check as require_approver — but every caller depends on the
+# named permission function below, never on the role comparison
+# directly. Introducing a real can_make_business_decision permissions
+# table later is then a one-function change: nothing at any call site
+# (routers, tests) needs to know the difference.
+_BUSINESS_DECISION_ROLES = (UserRole.EXECUTIVE, UserRole.ADMINISTRATOR)
+
+
+def user_can_make_business_decision(user: User) -> bool:
+    """The `can_make_business_decision` permission, as a plain predicate."""
+    return user.role in _BUSINESS_DECISION_ROLES
+
+
+def require_business_decision_permission(current_user: User = Depends(get_current_user)) -> User:
+    """Authorization for recording a Business Decision on a mission."""
+    if not user_can_make_business_decision(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to record a business decision.",
         )
     return current_user

@@ -6,6 +6,13 @@ doc — a genuine gap, same precedent as /auth/register and
 /missions/{id}/execute). POST /approval and GET /approval/{mission_id}
 match 06_API_Design.md directly.
 
+POST /approval is also the backend for the "Bid Decision" feature
+(docs/BID_DECISION_DESIGN.md) — that design doc originally proposed a
+new PATCH /missions/{id}/decision endpoint before discovering this one
+already implemented the same contract. record_decision() is Bid
+Decision's write path; get_approval_history()'s decision_events is its
+audit trail.
+
 This router never calls tender_service or decision_service — it only
 governs the lifecycle of a recommendation that already exists.
 """
@@ -15,7 +22,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_approver
+from app.api.deps import get_current_user, require_approver, require_business_decision_permission
 from app.core.database import get_db
 from app.models import User
 from app.schemas.approval import (
@@ -55,7 +62,7 @@ def verify_compliance_row(
 @approval_router.post("", response_model=MissionRead)
 def record_decision(
     payload: ApprovalDecisionRequest,
-    current_user: User = Depends(require_approver),
+    current_user: User = Depends(require_business_decision_permission),
     db: Session = Depends(get_db),
 ) -> MissionRead:
     try:

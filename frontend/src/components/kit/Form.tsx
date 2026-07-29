@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "../../lib/cn";
 
@@ -46,6 +46,22 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({ label, class
   </label>
 ));
 Select.displayName = "Select";
+
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+  hint?: string;
+}
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ label, hint, className, rows = 3, ...props }, ref) => (
+    <label className="block">
+      {label && <span className="text-xs font-medium text-foreground/90 mb-1.5 block">{label}</span>}
+      <textarea ref={ref} rows={rows} className={cn(fieldBase, "resize-none", className)} {...props} />
+      {hint && <span className="text-xs text-muted-foreground mt-1 block">{hint}</span>}
+    </label>
+  )
+);
+Textarea.displayName = "Textarea";
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

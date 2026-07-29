@@ -18,6 +18,10 @@ export type MatchStatus = "met" | "not_met" | "review_required" | "conditional";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type RecommendationType = "go" | "conditional_go" | "review" | "no_go";
 export type MissionStatus = "created" | "running" | "awaiting_approval" | "completed" | "archived";
+// The human's Business Decision (Bid Decision feature) -- deliberately a
+// separate vocabulary from RecommendationType (the AI's own output). "AI
+// advises, human decides": these values are never the AI's to choose.
+export type BusinessDecision = "proceed" | "rejected" | "needs_revision";
 export type CapabilityEntityType = "certification" | "employee" | "project" | "equipment" | "financial_record";
 export type VerificationStatus = "pending" | "verified" | "expired" | "review_required";
 
@@ -266,6 +270,29 @@ export interface MissionRead {
   // GET /missions/:id; null on other mission action responses.
   tender_id: string | null;
   tender_name: string | null;
+}
+
+// --- Bid Decision (Human Approval Layer -- POST/GET /api/v1/approval) ---
+
+export interface ApprovalDecisionRequest {
+  mission_id: string;
+  decision: BusinessDecision;
+  // Required server-side when decision === "rejected"; optional otherwise.
+  reason: string | null;
+}
+
+export interface DecisionEventRead {
+  user_id: string | null;
+  event: string;
+  result: string | null;
+  timestamp: string;
+}
+
+export interface ApprovalHistoryResponse {
+  mission: MissionRead;
+  recommendation: RecommendationRead;
+  compliance_matrix: ComplianceMatrixEntryRead[];
+  decision_events: DecisionEventRead[];
 }
 
 export interface ApiErrorDetail {

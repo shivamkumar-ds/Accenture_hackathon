@@ -20,7 +20,7 @@ import {
   Skeleton,
   SkeletonList,
 } from "../components/kit";
-import { Download, FileBarChart2 } from "lucide-react";
+import { Download, FileBarChart2, Gavel } from "lucide-react";
 import { cn } from "../lib/cn";
 
 export default function Reports() {
@@ -186,9 +186,16 @@ export default function Reports() {
                   title="Report Preview"
                   description={tenderDisplayName(selectedMission)}
                   action={
-                    <Button size="sm" icon={<Download size={14} />} loading={generatingPdf} onClick={handleDownload}>
-                      Download PDF Report
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Link to={`/missions/${selectedMission.id}`}>
+                        <Button size="sm" variant="outline" icon={<Gavel size={14} />}>
+                          Make Business Decision
+                        </Button>
+                      </Link>
+                      <Button size="sm" icon={<Download size={14} />} loading={generatingPdf} onClick={handleDownload}>
+                        Download PDF Report
+                      </Button>
+                    </div>
                   }
                 />
                 <CardBody className="space-y-6">

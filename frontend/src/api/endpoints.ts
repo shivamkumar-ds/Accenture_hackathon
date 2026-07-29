@@ -1,5 +1,7 @@
 import { apiClient } from "./client";
 import type {
+  ApprovalDecisionRequest,
+  ApprovalHistoryResponse,
   CapabilityGraphResponse,
   CompanyRead,
   DocumentRead,
@@ -139,3 +141,15 @@ export const executeMission = (missionId: string, provider?: "openai") =>
 // but the row and its evaluation history survive.
 export const archiveMission = (missionId: string) =>
   apiClient.delete<MissionRead>(`/api/v1/missions/${missionId}`).then((r) => r.data);
+
+// --- approval / Bid Decision ---
+// "AI advises, human decides" -- this is the write path for the Bid
+// Decision feature (docs/BID_DECISION_DESIGN.md). Backed by the existing
+// Human Approval Layer (POST/GET /api/v1/approval), not a new endpoint --
+// see that doc's §4 for why.
+
+export const recordDecision = (payload: ApprovalDecisionRequest) =>
+  apiClient.post<MissionRead>("/api/v1/approval", payload).then((r) => r.data);
+
+export const getApprovalHistory = (missionId: string) =>
+  apiClient.get<ApprovalHistoryResponse>(`/api/v1/approval/${missionId}`).then((r) => r.data);

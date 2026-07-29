@@ -92,6 +92,22 @@ class RecommendationType(str, enum.Enum):
     NO_GO = "no_go"
 
 
+class BusinessDecision(str, enum.Enum):
+    """
+    The human's Business Decision on a mission (Bid Decision feature,
+    docs/BID_DECISION_DESIGN.md) — deliberately a separate vocabulary
+    from RecommendationType. RecommendationType is the AI's own output
+    (what it recommends); BusinessDecision is what a human commits to
+    after reading that recommendation. Collapsing these into one enum
+    would blur "AI advises, human decides" into a single value the AI
+    could be seen as choosing on the human's behalf.
+    """
+
+    PROCEED = "proceed"
+    REJECTED = "rejected"
+    NEEDS_REVISION = "needs_revision"
+
+
 class CapabilityEntityType(str, enum.Enum):
     """Which of the five capability tables a Capability Mapping row points to."""
 

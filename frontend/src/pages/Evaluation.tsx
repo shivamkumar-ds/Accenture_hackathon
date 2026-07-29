@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getEvaluation, runEvaluation } from "../api/endpoints";
+import { getEvaluation, getMission, recordDecision, runEvaluation } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import { recommendationLabel } from "../lib/recommendationLabels";
 import { mergeRequirementContext, type MergedComplianceEntry } from "../lib/complianceMerge";
-import type { ComplianceMatrixEntryRead, EvaluationResponse, MatchStatus } from "../api/types";
+import type { BusinessDecision, ComplianceMatrixEntryRead, EvaluationResponse, MatchStatus, MissionRead } from "../api/types";
 import {
   AIProcessing,
   Badge,
@@ -19,8 +19,9 @@ import {
   FilterChip,
   SearchInput,
   Skeleton,
+  Textarea,
 } from "../components/kit";
-import { AlertOctagon, ChevronDown, RefreshCw, ShieldQuestion, TrendingUp } from "lucide-react";
+import { AlertOctagon, Check, ChevronDown, RefreshCw, ShieldQuestion, TrendingUp, X } from "lucide-react";
 import { cn } from "../lib/cn";
 
 const DECISION_STAGES = [
@@ -51,6 +52,7 @@ export default function Evaluation() {
   const { missionId } = useParams<{ missionId: string }>();
   const { notify } = useToast();
   const [data, setData] = useState<EvaluationResponse | null>(null);
+  const [mission, setMission] = useState<MissionRead | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -68,7 +70,12 @@ export default function Evaluation() {
     setLoading(true);
     setNotFound(false);
     try {
-      setData(await getEvaluation(missionId));
+      // Evaluation (AI analysis) and Mission (status, for the Business
+      // Decision panel below) are two separate resources; both must
+      // succeed for this page to render, so a single try/catch covers both.
+      const [evaluation, missionResult] = await Promise.all([getEvaluation(missionId), getMission(missionId)]);
+      setData(evaluation);
+      setMission(missionResult);
     } catch {
       setNotFound(true);
     } finally {
@@ -88,6 +95,10 @@ export default function Evaluation() {
       const result = await runEvaluation(missionId);
       setData(result);
       setNotFound(false);
+      // Re-running moves the mission to awaiting_approval (or resets a
+      // prior decision's completed status) -- refetch so the Business
+      // Decision panel below reflects the mission's real current state.
+      setMission(await getMission(missionId));
       notify("success", "Decision Engine evaluation complete.");
     } catch (err) {
       notify("error", extractErrorMessage(err));
@@ -338,6 +349,13 @@ export default function Evaluation() {
           )}
         </CardBody>
       </Card>
+
+      {/* Divider is deliberate (BID_DECISION_DESIGN.md §3): everything
+          above is AI Analysis, everything below is the human's own
+          Business Decision. AI advises, human decides. */}
+      {mission && (
+        <BusinessDecisionPanel mission={mission} onDecisionRecorded={setMission} />
+      )}
     </div>
   );
 }
@@ -395,6 +413,109 @@ function MatrixRow({ entry }: { entry: MergedEntry }) {
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{entry.notes}</p>
       )}
     </li>
+  );
+}
+
+const DECISION_OPTIONS: { value: BusinessDecision; label: string; icon: typeof Check }[] = [
+  { value: "proceed", label: "Proceed", icon: Check },
+  { value: "rejected", label: "Rejected", icon: X },
+  // Labeled "Needs Changes" in the UI per BID_DECISION_DESIGN.md §3 --
+  // "revision" reads as if the tender itself needs rework, when really
+  // it's the company's own eligibility that needs work. The underlying
+  // value stays needs_revision; this is a display-only relabel.
+  { value: "needs_revision", label: "Needs Changes", icon: RefreshCw },
+];
+
+function BusinessDecisionPanel({
+  mission,
+  onDecisionRecorded,
+}: {
+  mission: MissionRead;
+  onDecisionRecorded: (mission: MissionRead) => void;
+}) {
+  const { notify } = useToast();
+  const [selected, setSelected] = useState<BusinessDecision | null>(null);
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const alreadyDecided = mission.status === "completed";
+  const canDecide = mission.status === "awaiting_approval";
+
+  const handleSave = async () => {
+    if (!selected) return;
+    if (selected === "rejected" && !reason.trim()) {
+      notify("error", "A reason is required when rejecting a bid.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await recordDecision({
+        mission_id: mission.id,
+        decision: selected,
+        reason: reason.trim() || null,
+      });
+      onDecisionRecorded(updated);
+      notify("success", "Business decision saved.");
+      setSelected(null);
+      setReason("");
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader title="Business Decision" description="AI advises. You decide." />
+      <CardBody className="space-y-4">
+        {alreadyDecided ? (
+          <p className="text-sm text-muted-foreground">
+            This mission is already completed. Re-run the evaluation above if the underlying evidence has
+            changed and a new decision is needed.
+          </p>
+        ) : !canDecide ? (
+          <p className="text-sm text-muted-foreground">
+            A decision can only be recorded once a recommendation exists and the mission is awaiting approval
+            (current status: {mission.status}).
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {DECISION_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setSelected(value)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors",
+                    selected === value
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-surface hover:bg-surface-hover"
+                  )}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <Textarea
+              label={`Notes${selected === "rejected" ? " (required)" : " (optional)"}`}
+              placeholder="Why this decision? e.g. capacity risk, pricing, strategic fit…"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+
+            <div className="flex justify-end">
+              <Button onClick={handleSave} disabled={!selected} loading={saving}>
+                Save Decision
+              </Button>
+            </div>
+          </>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 

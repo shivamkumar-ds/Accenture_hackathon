@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from app.models.enums import ComplianceMatrixVerificationStatus, RecommendationType
+from app.models.enums import BusinessDecision, ComplianceMatrixVerificationStatus
 from app.schemas.decision import ComplianceMatrixEntryRead, RecommendationRead
 from app.schemas.mission import MissionRead
 
@@ -27,13 +27,13 @@ class VerifyComplianceRequest(BaseModel):
 
 class ApprovalDecisionRequest(BaseModel):
     mission_id: uuid.UUID
-    decision: RecommendationType
+    decision: BusinessDecision
     reason: str | None = None
 
     @model_validator(mode="after")
-    def _require_reason_for_no_go(self) -> "ApprovalDecisionRequest":
-        if self.decision == RecommendationType.NO_GO and not (self.reason and self.reason.strip()):
-            raise ValueError("A reason is required when the decision is NO_GO.")
+    def _require_reason_for_rejected(self) -> "ApprovalDecisionRequest":
+        if self.decision == BusinessDecision.REJECTED and not (self.reason and self.reason.strip()):
+            raise ValueError("A reason is required when the decision is 'rejected'.")
         return self
 
 
