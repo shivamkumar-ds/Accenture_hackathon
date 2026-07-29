@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getEvaluation, getMission, recordDecision, runEvaluation, verifyComplianceRow } from "../api/endpoints";
+import {
+  getEvaluation,
+  getMission,
+  getTender,
+  recordDecision,
+  runAnalysis,
+  runEvaluation,
+  verifyComplianceRow,
+} from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import { recommendationLabel } from "../lib/recommendationLabels";
 import { mergeRequirementContext, type MergedComplianceEntry } from "../lib/complianceMerge";
+import { tenderDisplayName } from "../lib/tenderName";
+import { forwardLookingGap } from "../lib/forwardLookingGap";
 import type {
   BusinessDecision,
   ComplianceMatrixEntryRead,
@@ -12,6 +22,8 @@ import type {
   MatchStatus,
   MissionRead,
   RecommendationRead,
+  RequirementType,
+  TenderWithRequirements,
   VerificationDecision,
 } from "../api/types";
 import {
@@ -29,9 +41,20 @@ import {
   Skeleton,
   Textarea,
 } from "../components/kit";
-import { AlertOctagon, Check, ChevronDown, Lightbulb, RefreshCw, ShieldCheck, ShieldQuestion, TrendingUp, X } from "lucide-react";
+import {
+  AlertOctagon,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  FileSearch,
+  Lightbulb,
+  RefreshCw,
+  ShieldCheck,
+  ShieldQuestion,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import { cn } from "../lib/cn";
-import { forwardLookingGap } from "../lib/forwardLookingGap";
 
 // The three real target values a human can verify a compliance row to --
 // "pending" is the starting state, never a target one (same rule the
@@ -47,6 +70,14 @@ const DECISION_STAGES = [
   "Matching requirements against evidence…",
   "Scoring compliance and risk…",
   "Drafting executive recommendation…",
+];
+
+// Absorbed from the now-deleted TenderDetail.tsx (Phase 4).
+const ANALYSIS_STAGES = [
+  "Parsing tender document…",
+  "Identifying clauses and obligations…",
+  "Classifying requirement types…",
+  "Scoring confidence per requirement…",
 ];
 
 // Display order for the grouped matrix -- the things that need a human's
@@ -66,14 +97,25 @@ function statusCount(matrix: ComplianceMatrixEntryRead[], status: MatchStatus) {
 
 type MergedEntry = MergedComplianceEntry;
 
+// Requirements / AI Recommendation -- collapses the former TenderDetail.tsx
+// + Evaluation.tsx route split into sections of one page
+// (docs/TENDER_JOURNEY_DESIGN.md §5, TENDER_JOURNEY_IMPLEMENTATION_PLAN.md
+// Phase 4). Decision History is a third section named in the design doc,
+// deferred to Phase 6 (needs an additive backend field first).
+type MissionSection = "requirements" | "recommendation";
+
 export default function Evaluation() {
   const { missionId } = useParams<{ missionId: string }>();
   const { notify } = useToast();
-  const [data, setData] = useState<EvaluationResponse | null>(null);
   const [mission, setMission] = useState<MissionRead | null>(null);
+  const [tenderData, setTenderData] = useState<TenderWithRequirements | null>(null);
+  const [data, setData] = useState<EvaluationResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [missionNotFound, setMissionNotFound] = useState(false);
+  const [section, setSection] = useState<MissionSection>("requirements");
+  const [analyzing, setAnalyzing] = useState(false);
   const [running, setRunning] = useState(false);
-  const [notFound, setNotFound] = useState(false);
+  const [requirementTypeFilter, setRequirementTypeFilter] = useState<RequirementType | "all">("all");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<MatchStatus | "all">("all");
   const [expanded, setExpanded] = useState<Record<MatchStatus, boolean>>({
@@ -86,16 +128,42 @@ export default function Evaluation() {
   const refresh = async () => {
     if (!missionId) return;
     setLoading(true);
-    setNotFound(false);
+    setMissionNotFound(false);
     try {
-      // Evaluation (AI analysis) and Mission (status, for the Business
-      // Decision panel below) are two separate resources; both must
-      // succeed for this page to render, so a single try/catch covers both.
-      const [evaluation, missionResult] = await Promise.all([getEvaluation(missionId), getMission(missionId)]);
-      setData(evaluation);
+      const missionResult = await getMission(missionId);
       setMission(missionResult);
+      // Section default logic (TENDER_JOURNEY_IMPLEMENTATION_PLAN.md Phase
+      // 4): mission.status determines what's actually possible to show, so
+      // it also decides which section a fresh page load lands on.
+      // Role-based defaults layered on top of this are Phase 7, not this
+      // one.
+      setSection(
+        missionResult.status === "created" || missionResult.status === "running" ? "requirements" : "recommendation"
+      );
+
+      // Requirements data -- independent of whether the Decision Engine has
+      // run. mission.tender_id should always be present once a tender
+      // upload succeeds, but this is guarded defensively rather than
+      // assumed.
+      if (missionResult.tender_id) {
+        try {
+          setTenderData(await getTender(missionResult.tender_id));
+        } catch (err) {
+          notify("error", extractErrorMessage(err));
+        }
+      }
+
+      // AI Recommendation data -- legitimately absent (404) until the
+      // Decision Engine has run at least once. That's an expected product
+      // state, not a page-level error, so it's handled separately from the
+      // mission fetch above instead of failing the whole page.
+      try {
+        setData(await getEvaluation(missionId));
+      } catch {
+        setData(null);
+      }
     } catch {
-      setNotFound(true);
+      setMissionNotFound(true);
     } finally {
       setLoading(false);
     }
@@ -106,17 +174,34 @@ export default function Evaluation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missionId]);
 
+  // Absorbed from the now-deleted TenderDetail.tsx (Phase 4) -- extracts
+  // requirements from the tender document. Stays on the Requirements
+  // section; does not switch sections on its own.
+  const handleAnalyze = async () => {
+    if (!mission?.tender_id) return;
+    setAnalyzing(true);
+    try {
+      const result = await runAnalysis(mission.tender_id);
+      setTenderData(result);
+      notify("success", `${result.requirements.length} requirements extracted.`);
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleRun = async () => {
     if (!missionId) return;
     setRunning(true);
     try {
       const result = await runEvaluation(missionId);
       setData(result);
-      setNotFound(false);
       // Re-running moves the mission to awaiting_approval (or resets a
       // prior decision's completed status) -- refetch so the Business
       // Decision panel below reflects the mission's real current state.
       setMission(await getMission(missionId));
+      setSection("recommendation");
       notify("success", "Decision Engine evaluation complete.");
     } catch (err) {
       notify("error", extractErrorMessage(err));
@@ -176,6 +261,24 @@ export default function Evaluation() {
     return groups;
   }, [filtered]);
 
+  // Requirements section data -- absorbed from the now-deleted
+  // TenderDetail.tsx (Phase 4). Memoized (not a plain `?? []` fallback) so
+  // its identity is stable across renders -- otherwise the `?? []` creates
+  // a new empty array every render, which would make the useMemo hooks
+  // below that depend on it re-run every time for no reason.
+  const requirements = useMemo(() => tenderData?.requirements ?? [], [tenderData]);
+  const requirementTypes = useMemo(
+    () => Array.from(new Set(requirements.map((r) => r.requirement_type))),
+    [requirements]
+  );
+  const filteredRequirements = useMemo(
+    () =>
+      requirementTypeFilter === "all"
+        ? requirements
+        : requirements.filter((r) => r.requirement_type === requirementTypeFilter),
+    [requirements, requirementTypeFilter]
+  );
+
   if (running) {
     return (
       <Card>
@@ -196,19 +299,18 @@ export default function Evaluation() {
     );
   }
 
-  if (notFound || !data) {
+  if (missionNotFound || !mission) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Decision Engine</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Mission</h1>
         </div>
         <Card>
           <CardBody>
             <EmptyState
               icon={TrendingUp}
-              title="This mission hasn't been evaluated yet"
-              description="Run the Decision Engine to match requirements against your capability library and generate a recommendation."
-              action={<Button onClick={handleRun}>Run Evaluation</Button>}
+              title="Mission not found"
+              description="This mission may have been deleted, or the link is incorrect."
             />
           </CardBody>
         </Card>
@@ -216,29 +318,183 @@ export default function Evaluation() {
     );
   }
 
-  const { recommendation, compliance_matrix } = data;
-  const accentBar =
-    recommendation.recommendation_type === "go"
-      ? "bg-success"
-      : recommendation.recommendation_type === "no_go"
-      ? "bg-danger"
-      : "bg-warning";
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">AI Recommendation</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{tenderDisplayName(mission)}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Generated {new Date(recommendation.generated_at).toLocaleString()}
+            {tenderData?.tender.organization ?? "No organization specified"}
           </p>
         </div>
-        <Button variant="outline" size="sm" icon={<RefreshCw size={14} />} onClick={handleRun}>
-          Re-run
-        </Button>
+        {section === "recommendation" && data && (
+          <Button variant="outline" size="sm" icon={<RefreshCw size={14} />} onClick={handleRun}>
+            Re-run
+          </Button>
+        )}
       </div>
 
-      {/* AI Recommendation -- the visual centerpiece of the page. Kept
+      {/* Requirements / AI Recommendation section switcher -- collapses the
+          former TenderDetail.tsx + Evaluation.tsx route split into one page
+          (docs/TENDER_JOURNEY_DESIGN.md §5; TenderDetail deleted this
+          phase). Reusing FilterChip as the switcher rather than introducing
+          a new tab component -- no equivalent exists in the kit yet and
+          this phase's scope is the page merge, not a new UI primitive.
+          Decision History is a third section named in the design doc,
+          deferred to Phase 6. */}
+      <div className="flex gap-2">
+        <FilterChip label="Requirements" active={section === "requirements"} onClick={() => setSection("requirements")} />
+        <FilterChip
+          label="AI Recommendation"
+          active={section === "recommendation"}
+          onClick={() => setSection("recommendation")}
+        />
+      </div>
+
+      {section === "requirements" && (
+        <div className="space-y-6">
+          <Card>
+            <CardBody>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Organization</p>
+                  <p className="font-medium">{tenderData?.tender.organization ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Closing Date</p>
+                  <p className="font-medium">{tenderData?.tender.closing_date ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Status</p>
+                  {tenderData?.tender.processing_status ? <Badge value={tenderData.tender.processing_status} /> : "—"}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Requirements</p>
+                  <p className="font-medium tabular-nums">{requirements.length}</p>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {analyzing ? (
+            <Card>
+              <CardBody>
+                <AIProcessing stages={ANALYSIS_STAGES} />
+              </CardBody>
+            </Card>
+          ) : requirements.length === 0 ? (
+            <Card>
+              <CardBody>
+                <EmptyState
+                  icon={FileSearch}
+                  title="Ready to analyze"
+                  description="Run the Tender Analyzer to extract requirements from this document."
+                  action={<Button onClick={handleAnalyze}>Run Tender Analyzer</Button>}
+                />
+              </CardBody>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardHeader
+                  title="Extracted Requirements"
+                  description={`${filteredRequirements.length} of ${requirements.length} shown`}
+                  action={
+                    <Button variant="outline" size="sm" onClick={handleAnalyze}>
+                      Re-run Analyzer
+                    </Button>
+                  }
+                />
+                <CardBody>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <FilterChip
+                      label="All"
+                      active={requirementTypeFilter === "all"}
+                      onClick={() => setRequirementTypeFilter("all")}
+                    />
+                    {requirementTypes.map((t) => (
+                      <FilterChip
+                        key={t}
+                        label={t.replace(/_/g, " ")}
+                        active={requirementTypeFilter === t}
+                        onClick={() => setRequirementTypeFilter(t)}
+                      />
+                    ))}
+                  </div>
+                  <ul className="divide-y divide-border -mx-6">
+                    {filteredRequirements.map((r) => (
+                      <li key={r.id} className="px-6 py-3 text-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <span className="leading-relaxed min-w-0">{r.description}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {r.mandatory && <Badge value="mandatory" />}
+                            <Badge value={r.requirement_type} />
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Page {r.source_page ?? "—"} · confidence{" "}
+                          {r.confidence != null ? `${Math.round(r.confidence * 100)}%` : "—"}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </CardBody>
+              </Card>
+
+              <Card className="border-primary/30 bg-primary/[0.03]">
+                <CardBody>
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold">Ready for Decision Engine</h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Match these {requirements.length} requirements against your capability library and generate a
+                        recommendation.
+                      </p>
+                    </div>
+                    <Button onClick={handleRun} size="lg" icon={<ArrowRight size={15} />}>
+                      Run Decision Engine
+                    </Button>
+                  </div>
+                </CardBody>
+              </Card>
+            </>
+          )}
+        </div>
+      )}
+
+      {section === "recommendation" &&
+        (!data ? (
+          <Card>
+            <CardBody>
+              <EmptyState
+                icon={TrendingUp}
+                title="This mission hasn't been evaluated yet"
+                description={
+                  requirements.length === 0
+                    ? "Extract requirements in the Requirements section first, then run the Decision Engine."
+                    : "Run the Decision Engine to match requirements against your capability library and generate a recommendation."
+                }
+                action={requirements.length > 0 ? <Button onClick={handleRun}>Run Evaluation</Button> : undefined}
+              />
+            </CardBody>
+          </Card>
+        ) : (
+          // IIFE so `data` (already narrowed non-null by the ternary above)
+          // can be destructured once for this whole block, same as the
+          // pre-Phase-4 top-level destructure -- avoids threading a large
+          // prop list through a separate component for what is still just
+          // one page's JSX.
+          (() => {
+            const { recommendation, compliance_matrix } = data;
+            const accentBar =
+              recommendation.recommendation_type === "go"
+                ? "bg-success"
+                : recommendation.recommendation_type === "no_go"
+                ? "bg-danger"
+                : "bg-warning";
+            return (
+              <div className="space-y-6">
+                {/* AI Recommendation -- the visual centerpiece of the page. Kept
           deliberately calm per the brand brief (flat surface, no gradient
           wash, no oversized warning colors): a single thin accent stripe
           carries the GO/NO-GO signal, everything else stays neutral and
@@ -488,6 +744,10 @@ export default function Evaluation() {
           )}
         </CardBody>
       </Card>
+              </div>
+            );
+          })()
+        ))}
     </div>
   );
 }

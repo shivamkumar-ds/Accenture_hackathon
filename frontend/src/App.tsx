@@ -9,7 +9,6 @@ import Dashboard from "./pages/Dashboard";
 import Documents from "./pages/Documents";
 import Capabilities from "./pages/Capabilities";
 import TenderUpload from "./pages/TenderUpload";
-import TenderDetail from "./pages/TenderDetail";
 import Missions from "./pages/Missions";
 import Evaluation from "./pages/Evaluation";
 import Reports from "./pages/Reports";
@@ -44,7 +43,6 @@ function AppRoutes() {
         <Route path="/documents" element={<Documents />} />
         <Route path="/capabilities" element={<Capabilities />} />
         <Route path="/tenders/new" element={<TenderUpload />} />
-        <Route path="/tenders/:tenderId" element={<TenderDetail />} />
         <Route path="/missions" element={<Missions />} />
         <Route path="/missions/:missionId" element={<Evaluation />} />
         <Route path="/reports" element={<Reports />} />
