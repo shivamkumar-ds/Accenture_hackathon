@@ -116,6 +116,27 @@ type MergedEntry = MergedComplianceEntry;
 // (already integrated into the AI Recommendation scroll by Phase 2).
 type MissionSection = "requirements" | "recommendation" | "history";
 
+// Second-level navigation inside the "recommendation" (Tender Assessment)
+// section only -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md's
+// navigation-hierarchy iteration. This solves a different problem than
+// MissionSection above: MissionSection separates the AI's input
+// (Requirements), the AI's reasoning (Tender Assessment), and the human's
+// audit trail (Decision History) -- three genuinely different data
+// sources, left untouched here per the explicit "do not merge" constraint.
+// AssessmentTab instead splits *one* section's own content into a
+// workspace (Overview / Analysis / Decision / Evidence) purely so the
+// user navigates instead of scrolling through one long report -- no new
+// data source, no new fetch, same `data`/`recommendation` object as
+// before this iteration.
+type AssessmentTab = "overview" | "analysis" | "decision" | "evidence";
+
+const ASSESSMENT_TABS: { value: AssessmentTab; label: string }[] = [
+  { value: "overview", label: "Overview" },
+  { value: "analysis", label: "Analysis" },
+  { value: "decision", label: "Decision" },
+  { value: "evidence", label: "Evidence" },
+];
+
 // Role-based default section (TENDER_JOURNEY_IMPLEMENTATION_PLAN.md Phase
 // 7, docs/TENDER_JOURNEY_DESIGN.md §5's persona table). mission.status
 // (see refresh() below) determines what's actually possible to show; this
@@ -159,6 +180,14 @@ export default function Evaluation() {
   const [loading, setLoading] = useState(true);
   const [missionNotFound, setMissionNotFound] = useState(false);
   const [section, setSection] = useState<MissionSection>("requirements");
+  // Second-level nav within the recommendation section -- local component
+  // state, same pattern as `section` above. No routing change and no URL
+  // state: nothing in this iteration asked for a shareable deep link to a
+  // specific tab, and local state matches the existing `section` switcher
+  // exactly, so this stays consistent rather than introducing a second
+  // state-management approach for one sub-nav. Starts on "overview" --
+  // every fresh visit lands on the executive-summary tab.
+  const [assessmentTab, setAssessmentTab] = useState<AssessmentTab>("overview");
   const [analyzing, setAnalyzing] = useState(false);
   const [running, setRunning] = useState(false);
   const [requirementTypeFilter, setRequirementTypeFilter] = useState<RequirementType | "all">("all");
@@ -170,6 +199,12 @@ export default function Evaluation() {
     conditional: false,
     met: false,
   });
+  // Analysis tab -- blocker groups (Why) default collapsed, keyed by
+  // RequirementType. Missing key === collapsed; explicit `true` === open.
+  // Kept separate from `expanded` above (that one's the Evidence tab's
+  // Compliance Matrix status groups -- a different list, different
+  // question, deliberately not the same state).
+  const [expandedBlockerGroups, setExpandedBlockerGroups] = useState<Record<string, boolean>>({});
   // For the PDF report's company name field only (Phase 5) -- same
   // best-effort, non-blocking fetch Reports.tsx used before this button
   // moved here.
@@ -276,6 +311,7 @@ export default function Evaluation() {
       // Decision panel below reflects the mission's real current state.
       setMission(await getMission(missionId));
       setSection("recommendation");
+      setAssessmentTab("overview");
       notify("success", "Decision Engine evaluation complete.");
     } catch (err) {
       notify("error", extractErrorMessage(err));
@@ -618,314 +654,357 @@ export default function Evaluation() {
                 : "bg-warning";
             return (
               <div className="space-y-6">
-                {/* The Assessment -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md
-          Phase 2, docs/TENDER_ASSESSMENT_REDESIGN.md §4. Merges the former
-          hero, "Can we bid?", and "Should we bid?" blocks into one: opens
-          with a spoken claim (not a labeled data point), holds the
-          eligibility gate (hard fact) and the risk judgment (soft fact) as
-          two distinct sentences inside the same block -- preserving the
-          blockingIssues vs. risk_level distinction as content, not as two
-          separate full-width sections -- and closes with a single grounded
-          consequence sentence synthesized from the #1-ranked blocker
-          (blockerPriority.ts), so this tier and Why tell one continuous
-          story instead of two independently-written summaries (redesign
-          doc §2's "no duplicate summaries" principle -- also why the
-          former "Key Reasons" paragraph, which repeated executive_summary
-          a second time, isn't carried forward here).
-
-          Kept deliberately calm per the brand brief (flat surface, no
-          gradient wash, no oversized warning colors): a single thin accent
-          stripe carries the GO/NO-GO signal, everything else stays neutral
-          and typographic so it reads as an executive decision report, not
-          a status dashboard.
-
-          Never "AI Decision" -- vocabulary rule unchanged
-          (docs/TENDER_JOURNEY_DESIGN.md §1). "Decision" is reserved
-          exclusively for the human action recorded below in
-          BusinessDecisionPanel. The AI advises; it never decides. */}
-      <div className="relative rounded-xl border bg-surface p-6 sm:p-8 shadow-hero overflow-hidden">
-        <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", accentBar)} />
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">The Assessment</span>
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-8 mt-3">
-          <div className="flex-1 space-y-3 min-w-0 order-2 md:order-1">
-            <p className="font-display font-semibold text-3xl md:text-4xl tracking-tight leading-tight">
-              {assessmentClaim(recommendation.recommendation_type)}
-            </p>
-            {recommendation.executive_summary && (
-              <p className="text-sm leading-relaxed text-foreground/80 max-w-2xl">{recommendation.executive_summary}</p>
-            )}
-          </div>
-          <div className="order-1 md:order-2 flex flex-col items-center gap-1.5 shrink-0">
-            <ConfidenceRing value={recommendation.overall_confidence} size={104} />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overall Confidence</span>
-          </div>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-5 mt-8 pt-6 border-t border-border">
-          <div className="flex items-start gap-3">
-            {blockingIssues.length > 0 ? (
-              <AlertOctagon size={20} className="text-danger shrink-0 mt-0.5" />
-            ) : (
-              <ShieldCheck size={20} className="text-success shrink-0 mt-0.5" />
-            )}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Can we bid?</p>
-              <p className="text-sm font-semibold tracking-tight">
-                {blockingIssues.length > 0
-                  ? `No — ${blockingIssues.length} mandatory requirement${blockingIssues.length === 1 ? "" : "s"} not met`
-                  : "Yes — every mandatory requirement is met"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <ShieldQuestion size={20} className="text-muted-foreground shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Should we bid?</p>
-              {recommendation.risk_level ? (
-                <p className="text-sm text-foreground/80 leading-relaxed">
-                  Overall risk assessed as{" "}
-                  <span className="font-medium text-foreground">{recommendation.risk_level}</span>, based on{" "}
-                  {blockingIssues.length > 0
-                    ? `${blockingIssues.length} unresolved mandatory requirement(s).`
-                    : "no unresolved mandatory requirements."}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">No risk level was returned for this evaluation.</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {assessmentConsequence(recommendation.recommendation_type, rankedBlockers[0]) && (
-          <p className="text-sm leading-relaxed text-foreground/90 mt-6 pt-6 border-t border-border">
-            {assessmentConsequence(recommendation.recommendation_type, rankedBlockers[0])}
-          </p>
-        )}
-
-      </div>
-
-      {/* Why -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 3,
-          docs/TENDER_ASSESSMENT_REDESIGN.md §4. Replaces "What's Blocking
-          This Bid": groups every mandatory-and-not-met gap by
-          requirement_type, each group carrying a plain-language
-          consequence rather than a bare count, and orders both the groups
-          and the items within them by severity (blockerPriority.ts's
-          rankBlockers) -- a "Top Priorities" ordering, not just a
-          grouping. This is also the point where the former duplicate
-          between "What's Blocking This Bid" and "What Would Change This
-          Recommendation" stops being a duplicate: Why answers "why," the
-          next card ("What Would It Take," Phase 4) answers "what would it
-          take" -- a different question, per §2's "one question per
-          section" rule. */}
-      {whyGroups.length > 0 && (
-        <Card className="border-danger/30">
-          <CardHeader
-            title={
-              <span className="flex items-center gap-2">
-                <AlertOctagon size={15} className="text-danger" />
-                Why
-              </span>
-            }
-            description={`${blockingIssues.length} mandatory requirement(s) not met, top priorities first`}
-          />
-          <CardBody className="!py-2 divide-y divide-border -mx-6">
-            {whyGroups.map((group) => (
-              <div key={group.type} className="px-6 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold">{group.label}</span>
-                  <Badge value={group.type} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{group.consequence}</p>
-                <ul className="divide-y divide-border mt-2 -mx-6 border-t border-border">
-                  {group.items.map((g) => (
-                    <li key={g.requirement_id} className="px-6 py-3 text-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="font-medium leading-relaxed">{g.description}</span>
-                        {g.riskLevel && <Badge value={g.riskLevel} withIcon />}
-                      </div>
-                      {g.reason && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{g.reason}</p>}
-                    </li>
+                {/* Second-level navigation -- docs/
+                    TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md's navigation-
+                    hierarchy iteration. The information hierarchy below
+                    (Overview -> Analysis -> Decision -> Evidence) is
+                    unchanged from the frozen redesign's five tiers; what
+                    changed is that the reader now navigates between them
+                    instead of scrolling through all of them at once.
+                    Deliberately a different visual language (underlined
+                    tabs, smaller text) than the pill-style FilterChip
+                    switcher above (Requirements / Tender Assessment /
+                    Decision History) -- two levels of navigation need two
+                    distinct visual weights, or this just becomes six flat
+                    tabs and recreates the same problem one layer down. */}
+                <div className="flex items-center gap-1 border-b border-border">
+                  {ASSESSMENT_TABS.map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setAssessmentTab(t.value)}
+                      className={cn(
+                        "px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                        assessmentTab === t.value
+                          ? "border-primary text-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {t.label}
+                    </button>
                   ))}
-                </ul>
-              </div>
-            ))}
-          </CardBody>
-        </Card>
-      )}
+                </div>
 
-      {/* What Would It Take -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md
-          Phase 4, docs/TENDER_ASSESSMENT_REDESIGN.md §4/§8. Renamed from
-          "What Would Change This Recommendation?" -- the redesign doc's
-          confirmed name; "Path to Eligibility" was considered and
-          rejected as the tier's universal title (too narrow for
-          Conditional/Review cases) but remains valid as in-tier language
-          for the eligibility-failure case specifically. Forward-looking
-          framing of the same mandatory not-met gaps Why (above) explains,
-          per docs/TENDER_JOURNEY_DESIGN.md §6 ("cheap, buildable now" half
-          only -- template-based, no LLM prompt change) -- answers a
-          genuinely different question than Why (diagnosis vs. prognosis),
-          which is why it stays a distinct card rather than folding into
-          it. Each blocker also carries its Administrative/Structural
-          classification (requirementCategory.ts) -- a static label, never
-          a score or percentage, per the redesign doc's explicit
-          constraint (§5). Sits between the blockers and the decision
-          itself: the last thing a decision-maker reads before deciding. */}
-      {rankedBlockers.length > 0 && (
-        <Card className="border-primary/20">
-          <CardHeader
-            title={
-              <span className="flex items-center gap-2">
-                <Lightbulb size={15} className="text-primary" />
-                What Would It Take
-              </span>
-            }
-            description="What it would take to clear each mandatory blocker"
-          />
-          <CardBody className="!py-2">
-            <ul className="divide-y divide-border -mx-6">
-              {rankedBlockers.map((g) => (
-                <li key={g.requirement_id} className="px-6 py-3 text-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-medium leading-relaxed">{g.description}</p>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide shrink-0">
-                      {REQUIREMENT_CATEGORY_LABELS[requirementCategory(g.requirement_type)]}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{forwardLookingGap(g)}</p>
-                </li>
-              ))}
-            </ul>
-          </CardBody>
-        </Card>
-      )}
+                {/* Overview -- the merged Assessment block (Phase 2),
+                    unchanged in content: opens with a spoken claim, holds
+                    the eligibility gate and risk judgment as two distinct
+                    sentences, closes with the grounded consequence line
+                    synthesized from the #1-ranked blocker. Designed to fit
+                    above the fold on a normal laptop with nothing else on
+                    the tab competing for space -- this alone should
+                    satisfy the redesign doc's 5-15 second budget for a
+                    clear-cut case. Never "AI Decision" -- vocabulary rule
+                    unchanged (docs/TENDER_JOURNEY_DESIGN.md §1);
+                    "Decision" is reserved for the human action in the
+                    Decision tab. */}
+                {assessmentTab === "overview" && (
+                  <div className="space-y-4">
+                    <div className="relative rounded-xl border bg-surface p-6 sm:p-8 shadow-hero overflow-hidden">
+                      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", accentBar)} />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">The Assessment</span>
+                      <div className="flex flex-col md:flex-row items-start md:items-center gap-8 mt-3">
+                        <div className="flex-1 space-y-3 min-w-0 order-2 md:order-1">
+                          <p className="font-display font-semibold text-3xl md:text-4xl tracking-tight leading-tight">
+                            {assessmentClaim(recommendation.recommendation_type)}
+                          </p>
+                          {recommendation.executive_summary && (
+                            <p className="text-sm leading-relaxed text-foreground/80 max-w-2xl">{recommendation.executive_summary}</p>
+                          )}
+                        </div>
+                        <div className="order-1 md:order-2 flex flex-col items-center gap-1.5 shrink-0">
+                          <ConfidenceRing value={recommendation.overall_confidence} size={104} />
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overall Confidence</span>
+                        </div>
+                      </div>
 
-      {/* Business Decision -- moved up to immediately follow the blocking
-          section (docs/TENDER_JOURNEY_DESIGN.md §3): everything above is
-          AI Analysis, this is the human's own Business Decision. AI
-          advises, human decides. The Compliance Matrix -- Supporting
-          Evidence -- now follows this, not the other way around. */}
-      {mission && (
-        <BusinessDecisionPanel
-          mission={mission}
-          blockingRowCount={blockingRows.length}
-          mandatoryBlockerCount={blockingIssues.length}
-          recommendation={recommendation}
-          onDecisionRecorded={setMission}
-        />
-      )}
+                      <div className="grid sm:grid-cols-2 gap-5 mt-8 pt-6 border-t border-border">
+                        <div className="flex items-start gap-3">
+                          {blockingIssues.length > 0 ? (
+                            <AlertOctagon size={20} className="text-danger shrink-0 mt-0.5" />
+                          ) : (
+                            <ShieldCheck size={20} className="text-success shrink-0 mt-0.5" />
+                          )}
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Can we bid?</p>
+                            <p className="text-sm font-semibold tracking-tight">
+                              {blockingIssues.length > 0
+                                ? `No — ${blockingIssues.length} mandatory requirement${blockingIssues.length === 1 ? "" : "s"} not met`
+                                : "Yes — every mandatory requirement is met"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <ShieldQuestion size={20} className="text-muted-foreground shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Should we bid?</p>
+                            {recommendation.risk_level ? (
+                              <p className="text-sm text-foreground/80 leading-relaxed">
+                                Overall risk assessed as{" "}
+                                <span className="font-medium text-foreground">{recommendation.risk_level}</span>, based on{" "}
+                                {blockingIssues.length > 0
+                                  ? `${blockingIssues.length} unresolved mandatory requirement(s).`
+                                  : "no unresolved mandatory requirements."}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No risk level was returned for this evaluation.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-      {/* Evidence -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 6,
-          docs/TENDER_ASSESSMENT_REDESIGN.md §4/§8. One closed-by-default
-          disclosure, not three independently-collapsible pieces: the
-          confidence breakdown (moved here from the Assessment block
-          above), the Compliance Summary tiles, and the Compliance Matrix
-          all live inside it. Every one of these answers the same
-          underlying question -- "why should I trust this assessment?" --
-          so they're one answer with internal structure, per §2's "no
-          duplicate summaries" principle. Native <details> (uncontrolled,
-          closed on load, same pattern MatrixRow already uses for its own
-          "View evidence trail") -- opening it triggers no fetch, all of
-          this data is already in `data` from refresh() above.
-
-          Not the same thing as Decision History further below: the
-          Compliance Matrix rows here carry row-level verification
-          provenance (verified_by_name / verified_at per row); Decision
-          History is the mission-level Business Decision audit trail. The
-          redesign doc is explicit that the two must not merge. */}
-      <details className="group rounded-xl border border-border bg-surface">
-        <summary className="flex items-center justify-between gap-3 px-6 py-4 cursor-pointer select-none list-none hover:bg-surface-hover transition-colors rounded-xl">
-          <span className="flex items-center gap-2 text-sm font-semibold">
-            <ShieldCheck size={15} className="text-muted-foreground" />
-            Evidence
-          </span>
-          <span className="flex items-center gap-2 text-xs text-muted-foreground">
-            Why should I trust this assessment?
-            <ChevronDown size={15} className="transition-transform group-open:rotate-180" />
-          </span>
-        </summary>
-
-        <div className="px-6 pb-6 pt-4 space-y-6 border-t border-border">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <ConfidenceBar label="Document Confidence" value={recommendation.document_confidence} />
-            <ConfidenceBar label="Entity Confidence" value={recommendation.entity_confidence} />
-            <ConfidenceBar label="Matching Confidence" value={recommendation.matching_confidence} />
-            <ConfidenceBar label="Recommendation Confidence" value={recommendation.recommendation_confidence} />
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Compliance Summary</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatusStat label="Met" status="met" count={statusCount(compliance_matrix, "met")} />
-              <StatusStat label="Not Met" status="not_met" count={statusCount(compliance_matrix, "not_met")} />
-              <StatusStat label="Review Required" status="review_required" count={statusCount(compliance_matrix, "review_required")} />
-              <StatusStat label="Conditional" status="conditional" count={statusCount(compliance_matrix, "conditional")} />
-            </div>
-          </div>
-
-          {/* Compliance matrix -- grouped by status instead of one long flat
-              scroll, requirement text leads every row, raw matched evidence
-              is tucked behind a "View evidence" disclosure instead of
-              printed in full for every single row. Unchanged from before
-              Phase 6 except its container. */}
-          <Card>
-            <CardHeader
-              title="Compliance Matrix"
-              description={`${filtered.length} of ${compliance_matrix.length} requirements · supporting evidence per row`}
-              action={<SearchInput value={query} onChange={setQuery} placeholder="Search requirements…" />}
-            />
-            <CardBody>
-              <div className="flex flex-wrap gap-2 mb-2">
-                <FilterChip label="All" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
-                {STATUS_ORDER.map((s) => (
-                  <FilterChip key={s} label={STATUS_COPY[s]} active={statusFilter === s} onClick={() => setStatusFilter(s)} />
-                ))}
-              </div>
-
-              {statusFilter === "all" ? (
-                <div className="-mx-6 divide-y divide-border">
-                  {STATUS_ORDER.filter((s) => grouped[s].length > 0).map((status) => (
-                    <div key={status}>
-                      <button
-                        onClick={() => setExpanded((prev) => ({ ...prev, [status]: !prev[status] }))}
-                        className="w-full flex items-center justify-between gap-3 px-6 py-3 text-sm font-medium hover:bg-surface-hover transition-colors"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Badge value={status} withIcon />
-                          <span className="text-muted-foreground font-normal">{grouped[status].length} requirement(s)</span>
-                        </span>
-                        <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", expanded[status] && "rotate-180")} />
-                      </button>
-                      {expanded[status] && (
-                        <ul className="divide-y divide-border bg-muted/30">
-                          {grouped[status].map((entry) => (
-                            <MatrixRow
-                              key={entry.id}
-                              entry={entry}
-                              missionStatus={mission?.status ?? null}
-                              onVerified={handleRowVerified}
-                            />
-                          ))}
-                        </ul>
+                      {assessmentConsequence(recommendation.recommendation_type, rankedBlockers[0]) && (
+                        <p className="text-sm leading-relaxed text-foreground/90 mt-6 pt-6 border-t border-border">
+                          {assessmentConsequence(recommendation.recommendation_type, rankedBlockers[0])}
+                        </p>
                       )}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <ul className="divide-y divide-border -mx-6">
-                  {filtered.map((entry) => (
-                    <MatrixRow
-                      key={entry.id}
-                      entry={entry}
-                      missionStatus={mission?.status ?? null}
-                      onVerified={handleRowVerified}
-                    />
-                  ))}
-                </ul>
-              )}
-            </CardBody>
-          </Card>
-        </div>
-      </details>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setAssessmentTab("analysis")}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-brand-accent hover:underline"
+                      >
+                        See Analysis
+                        <ArrowRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Analysis -- Why + What Would It Take together (Phases 3
+                    and 4), unchanged in content and still two distinct
+                    cards (diagnosis vs. prognosis stays a real distinction
+                    per the redesign doc), just no longer sharing the page
+                    with Overview/Decision/Evidence. Blocker groups within
+                    Why now default collapsed -- "Technical -- 7 blockers"
+                    with a count, not nine visible rows -- expanding on
+                    click reveals the individual blockers. Reduces what's
+                    on screen without hiding anything; the group's
+                    consequence line stays visible either way so collapsing
+                    a group doesn't cost the reader its meaning. */}
+                {assessmentTab === "analysis" && (
+                  <div className="space-y-6">
+                    {whyGroups.length > 0 ? (
+                      <Card className="border-danger/30">
+                        <CardHeader
+                          title={
+                            <span className="flex items-center gap-2">
+                              <AlertOctagon size={15} className="text-danger" />
+                              Why
+                            </span>
+                          }
+                          description={`${blockingIssues.length} mandatory requirement(s) not met, top priorities first`}
+                        />
+                        <CardBody className="!py-2 divide-y divide-border -mx-6">
+                          {whyGroups.map((group) => {
+                            const isOpen = expandedBlockerGroups[group.type] ?? false;
+                            return (
+                              <div key={group.type} className="px-6 py-3">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedBlockerGroups((prev) => ({ ...prev, [group.type]: !isOpen }))
+                                  }
+                                  className="w-full flex items-center justify-between gap-3 text-left"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold">{group.label}</span>
+                                    <Badge value={group.type} />
+                                  </span>
+                                  <span className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                                    {group.items.length} blocker{group.items.length === 1 ? "" : "s"}
+                                    <ChevronDown size={14} className={cn("transition-transform", isOpen && "rotate-180")} />
+                                  </span>
+                                </button>
+                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{group.consequence}</p>
+                                {isOpen && (
+                                  <ul className="divide-y divide-border mt-2 -mx-6 border-t border-border">
+                                    {group.items.map((g) => (
+                                      <li key={g.requirement_id} className="px-6 py-3 text-sm">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <span className="font-medium leading-relaxed">{g.description}</span>
+                                          {g.riskLevel && <Badge value={g.riskLevel} withIcon />}
+                                        </div>
+                                        {g.reason && (
+                                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{g.reason}</p>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </CardBody>
+                      </Card>
+                    ) : (
+                      <Card>
+                        <CardBody>
+                          <p className="text-sm text-muted-foreground">
+                            No mandatory requirements are unmet -- there's nothing blocking this bid to analyze.
+                          </p>
+                        </CardBody>
+                      </Card>
+                    )}
+
+                    {rankedBlockers.length > 0 && (
+                      <Card className="border-primary/20">
+                        <CardHeader
+                          title={
+                            <span className="flex items-center gap-2">
+                              <Lightbulb size={15} className="text-primary" />
+                              What Would It Take
+                            </span>
+                          }
+                          description="What it would take to clear each mandatory blocker"
+                        />
+                        <CardBody className="!py-2">
+                          <ul className="divide-y divide-border -mx-6">
+                            {rankedBlockers.map((g) => (
+                              <li key={g.requirement_id} className="px-6 py-3 text-sm">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="font-medium leading-relaxed">{g.description}</p>
+                                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide shrink-0">
+                                    {REQUIREMENT_CATEGORY_LABELS[requirementCategory(g.requirement_type)]}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{forwardLookingGap(g)}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardBody>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
+                {/* Decision -- the Business Decision panel (Phase 5),
+                    unchanged in content, now a real destination tab rather
+                    than the fourth card in a scroll. Decision History
+                    stays a separate top-level section, not merged --
+                    per the redesign doc's explicit constraint and this
+                    iteration's own -- the link below is a navigation
+                    shortcut into that existing section, not a duplicate of
+                    its content. */}
+                {assessmentTab === "decision" && (
+                  <div className="space-y-4">
+                    {mission && (
+                      <BusinessDecisionPanel
+                        mission={mission}
+                        blockingRowCount={blockingRows.length}
+                        mandatoryBlockerCount={blockingIssues.length}
+                        recommendation={recommendation}
+                        onDecisionRecorded={setMission}
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSection("history")}
+                      className="inline-flex items-center gap-1 text-sm font-medium text-brand-accent hover:underline"
+                    >
+                      <History size={14} />
+                      View Decision History
+                      <ArrowRight size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Evidence -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md's
+                    navigation-hierarchy iteration removes the closed-by-
+                    default <details> Phase 6 introduced: navigating to this
+                    tab is now itself the disclosure gesture, so wrapping
+                    the content in a second, redundant collapse would just
+                    add a click on top of a click. Content is otherwise
+                    unchanged -- confidence breakdown, Compliance Summary,
+                    and the Compliance Matrix, still structurally separate
+                    from Decision History (row-level verification
+                    provenance here vs. the mission-level Business Decision
+                    audit trail there). */}
+                {assessmentTab === "evidence" && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                      <ConfidenceBar label="Document Confidence" value={recommendation.document_confidence} />
+                      <ConfidenceBar label="Entity Confidence" value={recommendation.entity_confidence} />
+                      <ConfidenceBar label="Matching Confidence" value={recommendation.matching_confidence} />
+                      <ConfidenceBar label="Recommendation Confidence" value={recommendation.recommendation_confidence} />
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Compliance Summary</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <StatusStat label="Met" status="met" count={statusCount(compliance_matrix, "met")} />
+                        <StatusStat label="Not Met" status="not_met" count={statusCount(compliance_matrix, "not_met")} />
+                        <StatusStat label="Review Required" status="review_required" count={statusCount(compliance_matrix, "review_required")} />
+                        <StatusStat label="Conditional" status="conditional" count={statusCount(compliance_matrix, "conditional")} />
+                      </div>
+                    </div>
+
+                    {/* Compliance matrix -- grouped by status instead of one
+                        long flat scroll, requirement text leads every row,
+                        raw matched evidence is tucked behind a "View
+                        evidence" disclosure instead of printed in full for
+                        every single row. Unchanged since Phase 6 except its
+                        container. */}
+                    <Card>
+                      <CardHeader
+                        title="Compliance Matrix"
+                        description={`${filtered.length} of ${compliance_matrix.length} requirements · supporting evidence per row`}
+                        action={<SearchInput value={query} onChange={setQuery} placeholder="Search requirements…" />}
+                      />
+                      <CardBody>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <FilterChip label="All" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
+                          {STATUS_ORDER.map((s) => (
+                            <FilterChip key={s} label={STATUS_COPY[s]} active={statusFilter === s} onClick={() => setStatusFilter(s)} />
+                          ))}
+                        </div>
+
+                        {statusFilter === "all" ? (
+                          <div className="-mx-6 divide-y divide-border">
+                            {STATUS_ORDER.filter((s) => grouped[s].length > 0).map((status) => (
+                              <div key={status}>
+                                <button
+                                  onClick={() => setExpanded((prev) => ({ ...prev, [status]: !prev[status] }))}
+                                  className="w-full flex items-center justify-between gap-3 px-6 py-3 text-sm font-medium hover:bg-surface-hover transition-colors"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <Badge value={status} withIcon />
+                                    <span className="text-muted-foreground font-normal">{grouped[status].length} requirement(s)</span>
+                                  </span>
+                                  <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", expanded[status] && "rotate-180")} />
+                                </button>
+                                {expanded[status] && (
+                                  <ul className="divide-y divide-border bg-muted/30">
+                                    {grouped[status].map((entry) => (
+                                      <MatrixRow
+                                        key={entry.id}
+                                        entry={entry}
+                                        missionStatus={mission?.status ?? null}
+                                        onVerified={handleRowVerified}
+                                      />
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <ul className="divide-y divide-border -mx-6">
+                            {filtered.map((entry) => (
+                              <MatrixRow
+                                key={entry.id}
+                                entry={entry}
+                                missionStatus={mission?.status ?? null}
+                                onVerified={handleRowVerified}
+                              />
+                            ))}
+                          </ul>
+                        )}
+                      </CardBody>
+                    </Card>
+                  </div>
+                )}
               </div>
             );
           })()
