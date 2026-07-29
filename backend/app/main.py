@@ -4,11 +4,12 @@ BidOps AI — Application entrypoint.
 
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
@@ -31,6 +32,30 @@ app = FastAPI(
     description="Enterprise Bid Decision Intelligence Platform",
     debug=settings.debug,
 )
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Phase 1.5 finding #3 — standard, low-cost hardening headers absent
+    until now. CORS already restricts which origins can call this API
+    (above); these headers restrict what a browser is allowed to do with
+    the response once received: never sniff a response's content-type
+    into something more dangerous than declared, never render this API
+    inside a frame (there's no legitimate embedding use case), and always
+    upgrade to HTTPS on repeat visits once actually served over it. HSTS
+    is real only over HTTPS -- browsers ignore it over plain HTTP -- so it
+    only fires outside local dev to avoid an inert header on every
+    response during development."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        if settings.app_env != "development":
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS (BidOps_Final Milestone 4). Env-driven allowlist rather than a
 # single hardcoded origin, so the same code runs correctly across local
