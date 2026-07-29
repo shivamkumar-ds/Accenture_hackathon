@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
+  getCompany,
   getEvaluation,
   getMission,
   getTender,
@@ -11,6 +12,7 @@ import {
 } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
 import { recommendationLabel } from "../lib/recommendationLabels";
 import { mergeRequirementContext, type MergedComplianceEntry } from "../lib/complianceMerge";
 import { tenderDisplayName } from "../lib/tenderName";
@@ -46,6 +48,7 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  Download,
   FileSearch,
   Lightbulb,
   RefreshCw,
@@ -107,6 +110,7 @@ type MissionSection = "requirements" | "recommendation";
 export default function Evaluation() {
   const { missionId } = useParams<{ missionId: string }>();
   const { notify } = useToast();
+  const { user } = useAuth();
   const [mission, setMission] = useState<MissionRead | null>(null);
   const [tenderData, setTenderData] = useState<TenderWithRequirements | null>(null);
   const [data, setData] = useState<EvaluationResponse | null>(null);
@@ -124,6 +128,18 @@ export default function Evaluation() {
     conditional: false,
     met: false,
   });
+  // For the PDF report's company name field only (Phase 5) -- same
+  // best-effort, non-blocking fetch Reports.tsx used before this button
+  // moved here.
+  const [companyName, setCompanyName] = useState("");
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  useEffect(() => {
+    if (!user?.company_id) return;
+    getCompany(user.company_id)
+      .then((c) => setCompanyName(c.name))
+      .catch(() => undefined);
+  }, [user?.company_id]);
 
   const refresh = async () => {
     if (!missionId) return;
@@ -214,6 +230,28 @@ export default function Evaluation() {
     () => (data ? mergeRequirementContext(data.compliance_matrix, data.gap_analysis) : []),
     [data]
   );
+
+  // Phase 5: folds Reports.tsx's former "Download PDF Report" action into
+  // the mission page it was always describing -- same generateEvaluationPdf
+  // call, same merged data, same meta shape, just invoked from here instead
+  // (docs/TENDER_JOURNEY_IMPLEMENTATION_PLAN.md Phase 5). lib/pdfReport.ts
+  // itself is untouched.
+  const handleDownloadPdf = async () => {
+    if (!data || !mission) return;
+    setGeneratingPdf(true);
+    try {
+      const { generateEvaluationPdf } = await import("../lib/pdfReport");
+      generateEvaluationPdf(data, merged, {
+        companyName,
+        missionType: tenderDisplayName(mission),
+        missionId: mission.id,
+      });
+    } catch {
+      notify("error", "Couldn't generate the PDF report.");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   const blockingIssues = useMemo(
     () => (data?.gap_analysis ?? []).filter((g) => g.mandatory && g.status === "not_met"),
@@ -328,9 +366,20 @@ export default function Evaluation() {
           </p>
         </div>
         {section === "recommendation" && data && (
-          <Button variant="outline" size="sm" icon={<RefreshCw size={14} />} onClick={handleRun}>
-            Re-run
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Download size={14} />}
+              loading={generatingPdf}
+              onClick={handleDownloadPdf}
+            >
+              Download PDF Report
+            </Button>
+            <Button variant="outline" size="sm" icon={<RefreshCw size={14} />} onClick={handleRun}>
+              Re-run
+            </Button>
+          </div>
         )}
       </div>
 
