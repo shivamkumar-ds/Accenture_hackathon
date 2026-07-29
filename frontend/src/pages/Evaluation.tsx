@@ -226,7 +226,7 @@ export default function Evaluation() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Decision Engine Result</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">AI Recommendation</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Generated {new Date(recommendation.generated_at).toLocaleString()}
           </p>
@@ -236,14 +236,21 @@ export default function Evaluation() {
         </Button>
       </div>
 
-      {/* AI Decision -- the visual centerpiece of the page. Kept deliberately
-          calm per the brand brief (flat surface, no gradient wash, no
-          oversized warning colors): a single thin accent stripe carries the
-          GO/NO-GO signal, everything else stays neutral and typographic so
-          it reads as an executive decision report, not a status dashboard. */}
+      {/* AI Recommendation -- the visual centerpiece of the page. Kept
+          deliberately calm per the brand brief (flat surface, no gradient
+          wash, no oversized warning colors): a single thin accent stripe
+          carries the GO/NO-GO signal, everything else stays neutral and
+          typographic so it reads as an executive decision report, not a
+          status dashboard.
+
+          Labeled "AI Recommendation," never "AI Decision" -- Tender
+          Journey design philosophy (docs/TENDER_JOURNEY_DESIGN.md §1):
+          "Decision" is reserved exclusively for the human action recorded
+          below in BusinessDecisionPanel. The AI advises; it never decides,
+          and the label must never imply otherwise. */}
       <div className="relative rounded-xl border bg-surface p-6 sm:p-8 shadow-hero overflow-hidden">
         <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", accentBar)} />
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AI Decision</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AI Recommendation</span>
         <div className="flex flex-col md:flex-row items-start md:items-center gap-8 mt-3">
           <div className="flex-1 space-y-3 min-w-0 order-2 md:order-1">
             <div className="flex items-center gap-2 flex-wrap">

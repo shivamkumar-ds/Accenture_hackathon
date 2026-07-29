@@ -202,7 +202,10 @@ export default function Reports() {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
                     <ConfidenceRing value={evaluation.recommendation.overall_confidence} size={88} />
                     <div className="space-y-2 min-w-0">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AI Decision</p>
+                      {/* "AI Recommendation," never "AI Decision" -- see
+                          docs/TENDER_JOURNEY_DESIGN.md §1: "Decision" is
+                          reserved for the human's own recorded action. */}
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AI Recommendation</p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-2xl font-bold tracking-tight">
                           {recommendationLabel(evaluation.recommendation.recommendation_type)}
