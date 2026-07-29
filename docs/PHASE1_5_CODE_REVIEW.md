@@ -6,14 +6,9 @@ Read-only review — no code was changed to produce this document. Findings are 
 
 ---
 
-## 1. Verify the OpenAI model configuration
+## 1. ~~Verify the OpenAI model configuration~~ — RESOLVED, no issue
 
-**Problem:** `backend/app/core/config.py:76` defaults `openai_model` to `"gpt-5.6"`, and both `backend/.env` and `backend/.env.example` set it explicitly to the same value.
-**Why it matters:** if this isn't a real, currently-available OpenAI model id, every real (non-mock) LLM call fails at the API boundary — the single most consequential possible finding in this review, since it would silently block tender processing the moment real API funding begins.
-**Impact:** Critical if wrong, zero if right — this review can't tell which from the code alone; my training data predates whatever OpenAI has released most recently, so I can't independently confirm or deny it.
-**Proposed solution:** A two-minute manual check against OpenAI's current model catalog before Phase 1.5 work begins in earnest, not a code change.
-**Implementation complexity:** Trivial.
-**Recommendation:** Do this first, before anything else in this document — it's a blocking check, not a nice-to-have.
+**Update:** Verified via web search — `gpt-5.6` is a real, current OpenAI model family (released July 9, 2026); the bare `gpt-5.6` alias routes to GPT-5.6 Sol. `backend/app/core/config.py:76` and both `.env` files are correct as configured. No action needed.
 
 ---
 

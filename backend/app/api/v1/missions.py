@@ -9,11 +9,12 @@ in the frozen doc names an execution trigger, same precedent as
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models import Document, Mission, Tender, User
 from app.schemas.decision import RecommendationRead
 from app.schemas.mission import ExecuteMissionRequest, MissionRead
@@ -89,8 +90,16 @@ def archive_mission(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
+# 10/minute per IP (Phase 1.5 finding #2) -- this is the Mission
+# Orchestrator's own trigger for the full Decision Engine LLM run
+# (mission_service.execute_mission -> decision_service.run_evaluation),
+# the same cost profile /evaluation/run already carries a limit for.
+# Left unrated until now was an oversight, not a deliberate exemption --
+# every other cost-incurring endpoint already has this rate.
 @router.post("/{mission_id}/execute", response_model=MissionRead)
+@limiter.limit("10/minute")
 async def execute_mission(
+    request: Request,
     mission_id: uuid.UUID,
     payload: ExecuteMissionRequest | None = None,
     current_user: User = Depends(get_current_user),
