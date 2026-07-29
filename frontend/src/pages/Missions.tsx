@@ -195,7 +195,7 @@ export default function Missions() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Tender Workspace</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Every tender's journey from upload to executive recommendation.
+          Every tender's journey from upload to Tender Assessment.
         </p>
       </div>
 
@@ -218,12 +218,12 @@ export default function Missions() {
                 onChange={(e) => setStatusFilter(e.target.value as MissionStatus | "all")}
                 aria-label="Filter by status"
               >
-                <option value="all">All statuses</option>
-                <option value="created">Uploaded</option>
-                <option value="running">AI Processing</option>
-                <option value="awaiting_approval">Awaiting Approval</option>
-                <option value="completed">Completed</option>
-                <option value="archived">Archived</option>
+                <option value="all">Status: All</option>
+                <option value="created">Status: Uploaded</option>
+                <option value="running">Status: AI Processing</option>
+                <option value="awaiting_approval">Status: Awaiting Approval</option>
+                <option value="completed">Status: Completed</option>
+                <option value="archived">Status: Archived</option>
               </Select>
             </div>
             <div className="w-44">
