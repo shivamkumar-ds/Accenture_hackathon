@@ -63,6 +63,7 @@ when working on that feature again, not general-purpose reference.
 | `COMPLIANCE_VERIFICATION_UI_NOTE.md` | Compliance Verification UI design note |
 | `COMPLIANCE_VERIFICATION_UI_IMPLEMENTATION_PLAN.md` | Compliance Verification UI implementation plan |
 | `TENDER_JOURNEY_DESIGN.md` | Tender Journey & Business Decision experience design (frozen, not yet implemented) — the frontend product philosophy for the mission lifecycle |
+| `TENDER_JOURNEY_IMPLEMENTATION_PLAN.md` | Tender Journey implementation plan (proposed, awaiting review) — 7 phases derived from the design doc above |
 
 ## Audit reports
 
