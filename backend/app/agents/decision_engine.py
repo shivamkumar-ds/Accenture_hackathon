@@ -124,6 +124,7 @@ async def match_requirement(
     raw_response = await client.complete(
         decision_matching.SYSTEM_PROMPT,
         decision_matching.build_prompt(requirement.description or "", candidate_summaries),
+        purpose="decision_matching",
     )
     validated = DecisionMatchExtraction.model_validate(parse_json_response(raw_response))
     status = MatchStatus(validated.status)

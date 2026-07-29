@@ -66,7 +66,9 @@ async def analyze_tender(file_path: Path, provider: str | None = None) -> list[R
             page_had_text[page_num] = bool(text.strip())
 
         user_prompt = tender_requirement.build_prompt(chunk_pages)
-        raw_response = await client.complete(tender_requirement.SYSTEM_PROMPT, user_prompt)
+        raw_response = await client.complete(
+            tender_requirement.SYSTEM_PROMPT, user_prompt, purpose="tender_requirement_extraction"
+        )
 
         extracted_json = parse_json_response(raw_response)
         validated = TenderChunkExtraction.model_validate(extracted_json)

@@ -37,6 +37,7 @@ per-milestone convenience.
 
 import asyncio
 import logging
+import time
 from functools import lru_cache
 from typing import Protocol
 
@@ -48,9 +49,14 @@ from app.agents.llm_exceptions import (
     LLMTimeoutError,
 )
 from app.core.config import get_settings
+from app.core.telemetry import record_llm_call
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+# Token counts are (input_tokens, output_tokens), either of which may be
+# None when a provider doesn't report usage for a given call.
+TokenUsage = tuple[int | None, int | None]
 
 
 @lru_cache
@@ -184,9 +190,45 @@ def _get_gemini_http_client():
 
 
 class LLMClient(Protocol):
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
-        """Returns the raw text completion for a given system/user prompt pair."""
+    async def complete(self, system_prompt: str, user_prompt: str, purpose: str = "unspecified") -> str:
+        """Returns the raw text completion for a given system/user prompt pair.
+
+        `purpose` is a free-text tag (e.g. "decision_matching",
+        "capability_extraction") recorded against this call in
+        LLMCallEvent telemetry -- Phase A instrumentation, see
+        docs/CORE_ARCHITECTURE.md. Optional and defaulted so existing
+        call sites keep working unchanged; new/updated call sites
+        should pass a real value so cost/latency can be broken down by
+        pipeline stage later."""
         ...
+
+
+async def _timed(
+    provider: str, model: str, purpose: str, impl,
+) -> str:
+    """Shared telemetry wrapper: times `impl()` (an async callable returning
+    (text, (input_tokens, output_tokens))), records exactly one
+    LLMCallEvent regardless of success or failure, and never lets a
+    telemetry failure mask or replace the real outcome -- record_llm_call
+    itself already swallows its own errors (see app/core/telemetry.py)."""
+    start = time.monotonic()
+    try:
+        text, (input_tokens, output_tokens) = await impl()
+    except Exception as exc:
+        record_llm_call(
+            purpose=purpose, provider=provider, model=model,
+            input_tokens=None, output_tokens=None,
+            latency_ms=int((time.monotonic() - start) * 1000),
+            success=False, error_type=type(exc).__name__,
+        )
+        raise
+    record_llm_call(
+        purpose=purpose, provider=provider, model=model,
+        input_tokens=input_tokens, output_tokens=output_tokens,
+        latency_ms=int((time.monotonic() - start) * 1000),
+        success=True,
+    )
+    return text
 
 
 class OpenAIClient:
@@ -208,7 +250,13 @@ class OpenAIClient:
     def __init__(self) -> None:
         self._client = _get_openai_http_client()
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(self, system_prompt: str, user_prompt: str, purpose: str = "unspecified") -> str:
+        return await _timed(
+            "openai", settings.openai_model, purpose,
+            lambda: self._complete_impl(system_prompt, user_prompt),
+        )
+
+    async def _complete_impl(self, system_prompt: str, user_prompt: str) -> tuple[str, TokenUsage]:
         import openai
 
         max_attempts = settings.openai_max_retries + 1
@@ -232,7 +280,12 @@ class OpenAIClient:
                         {"role": "user", "content": user_prompt},
                     ],
                 )
-                return response.choices[0].message.content or ""
+                usage = getattr(response, "usage", None)
+                token_usage: TokenUsage = (
+                    getattr(usage, "prompt_tokens", None),
+                    getattr(usage, "completion_tokens", None),
+                )
+                return response.choices[0].message.content or "", token_usage
 
             except openai.AuthenticationError as exc:
                 # Never retried -- a bad key doesn't become a good one on
@@ -329,7 +382,13 @@ class QwenClient:
     def __init__(self) -> None:
         self._client = _get_qwen_http_client()
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(self, system_prompt: str, user_prompt: str, purpose: str = "unspecified") -> str:
+        return await _timed(
+            "qwen", settings.qwen_model, purpose,
+            lambda: self._complete_impl(system_prompt, user_prompt),
+        )
+
+    async def _complete_impl(self, system_prompt: str, user_prompt: str) -> tuple[str, TokenUsage]:
         import openai
 
         max_attempts = settings.qwen_max_retries + 1
@@ -345,7 +404,12 @@ class QwenClient:
                     ],
                     temperature=0,
                 )
-                return response.choices[0].message.content or ""
+                usage = getattr(response, "usage", None)
+                token_usage: TokenUsage = (
+                    getattr(usage, "prompt_tokens", None),
+                    getattr(usage, "completion_tokens", None),
+                )
+                return response.choices[0].message.content or "", token_usage
 
             except openai.AuthenticationError as exc:
                 # Never retried -- see class docstring above.
@@ -489,7 +553,13 @@ class GeminiClient:
     def __init__(self) -> None:
         self._client = _get_gemini_http_client()
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(self, system_prompt: str, user_prompt: str, purpose: str = "unspecified") -> str:
+        return await _timed(
+            "gemini", settings.gemini_model, purpose,
+            lambda: self._complete_impl(system_prompt, user_prompt),
+        )
+
+    async def _complete_impl(self, system_prompt: str, user_prompt: str) -> tuple[str, TokenUsage]:
         import httpx
         from google.auth import exceptions as google_auth_exceptions
         from google.genai import errors, types
@@ -503,7 +573,12 @@ class GeminiClient:
                     temperature=0,
                 ),
             )
-            return response.text or ""
+            usage = getattr(response, "usage_metadata", None)
+            token_usage: TokenUsage = (
+                getattr(usage, "prompt_token_count", None),
+                getattr(usage, "candidates_token_count", None),
+            )
+            return response.text or "", token_usage
 
         except google_auth_exceptions.DefaultCredentialsError as exc:
             # Vertex AI mode only: no Application Default Credentials could
@@ -627,10 +702,13 @@ class MockLLMClient:
     genuinely exercised against real (if synthetic) test documents.
     """
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(self, system_prompt: str, user_prompt: str, purpose: str = "unspecified") -> str:
         from app.agents.mock_extraction import generate_mock_response
 
-        return generate_mock_response(system_prompt, user_prompt)
+        async def _impl() -> tuple[str, TokenUsage]:
+            return generate_mock_response(system_prompt, user_prompt), (None, None)
+
+        return await _timed("mock", "mock", purpose, _impl)
 
 
 def get_llm_client(provider: str | None = None) -> LLMClient:

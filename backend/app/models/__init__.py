@@ -12,6 +12,7 @@ from app.models.company import Company, User
 from app.models.document import Document
 from app.models.mission import CapabilitySnapshot, Mission
 from app.models.recommendation import ComplianceMatrix, Recommendation
+from app.models.telemetry import LLMCallEvent
 from app.models.tender import CapabilityMapping, Requirement, Tender
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "Mission",
     "ComplianceMatrix",
     "Recommendation",
+    "LLMCallEvent",
     "CapabilityMapping",
     "Requirement",
     "Tender",

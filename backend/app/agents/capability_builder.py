@@ -73,7 +73,7 @@ async def build_capability(
     user_prompt = prompt_module.build_prompt(parsed.text)
 
     client = get_llm_client()
-    raw_response = await client.complete(prompt_module.SYSTEM_PROMPT, user_prompt)
+    raw_response = await client.complete(prompt_module.SYSTEM_PROMPT, user_prompt, purpose="capability_extraction")
 
     extracted_json = parse_json_response(raw_response)
     schema_cls = EXTRACTION_SCHEMAS[entity_type]

@@ -91,7 +91,7 @@ class _TrackingLLMClient:
         self.fail_on_call = fail_on_call
         self._lock = asyncio.Lock()
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(self, system_prompt: str, user_prompt: str, purpose: str = "unspecified") -> str:
         async with self._lock:
             self.call_count += 1
             this_call = self.call_count
