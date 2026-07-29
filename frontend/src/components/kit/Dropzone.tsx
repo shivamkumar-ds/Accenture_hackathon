@@ -71,6 +71,9 @@ export function Dropzone({
   // is kept as the default everywhere else (e.g. New Tender).
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="Upload file"
       onDragOver={(e) => {
         e.preventDefault();
         setDragging(true);
@@ -78,10 +81,21 @@ export function Dropzone({
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
+      // Keyboard-only users can't fire a click event on a <div> -- Enter/
+      // Space are the two activation keys a "button" role is expected to
+      // respond to (WAI-ARIA button pattern). e.preventDefault() on Space
+      // stops the page itself from scrolling on keydown.
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
       className={cn(
         compact
           ? "flex items-center gap-2 rounded-lg border-2 border-dashed px-4 cursor-pointer transition-colors"
           : "flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-surface-hover",
         className
       )}
