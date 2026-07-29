@@ -36,6 +36,7 @@ What needs manual judgment, not a query:
 - **False positives** — a requirement marked `met` that wasn't really satisfied by the cited evidence.
 - **False negatives** — a requirement marked `not_met`/`review_required` that a human would call clearly satisfied.
 - **Extraction quality** — did `tender_analyzer.py` find every real requirement, or miss/misclassify any? (Cross-check against a manual read of the tender document itself, not against the app's own output.)
+- **User friction** — where a human hesitated, got confused, or needed extra effort even though the system was technically correct. Telemetry can't see this — no latency number or token count reveals that someone stared at a screen unsure what to click — but it's often what drives the highest-value UX fixes, more than any metric above.
 
 ## Findings Log
 
