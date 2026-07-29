@@ -11,6 +11,7 @@ import type {
   EvaluationResponse,
   MatchStatus,
   MissionRead,
+  RecommendationRead,
   VerificationDecision,
 } from "../api/types";
 import {
@@ -278,13 +279,42 @@ export default function Evaluation() {
         </div>
       </div>
 
-      {/* Risk Summary */}
+      {/* Can we bid? -- hard eligibility gates, visually dominant, first
+          question in the Tender Journey's decision sequence
+          (docs/TENDER_JOURNEY_DESIGN.md §3). A one-glance binary answer,
+          not the itemized list -- the specific reasons stay in "What's
+          Blocking This Bid" further down, unchanged. */}
+      <div
+        className={cn(
+          "rounded-xl border p-5 flex items-center gap-4",
+          blockingIssues.length > 0 ? "border-danger/40 bg-danger-soft" : "border-success/40 bg-success-soft"
+        )}
+      >
+        {blockingIssues.length > 0 ? (
+          <AlertOctagon size={26} className="text-danger shrink-0" />
+        ) : (
+          <ShieldCheck size={26} className="text-success shrink-0" />
+        )}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Can we bid?</p>
+          <p className="text-lg font-semibold tracking-tight">
+            {blockingIssues.length > 0
+              ? `No — ${blockingIssues.length} mandatory requirement${blockingIssues.length === 1 ? "" : "s"} not met`
+              : "Yes — every mandatory requirement is met"}
+          </p>
+        </div>
+      </div>
+
+      {/* Should we bid? -- strategic/risk framing, the second question in
+          the sequence, distinct from the binary eligibility gate above.
+          (Previously titled "Risk Summary" -- relabeled per
+          docs/TENDER_JOURNEY_DESIGN.md §3; content unchanged.) */}
       <Card>
         <CardHeader
           title={
             <span className="flex items-center gap-2">
               <ShieldQuestion size={15} className="text-muted-foreground" />
-              Risk Summary
+              Should we bid?
             </span>
           }
         />
@@ -305,19 +335,8 @@ export default function Evaluation() {
         </CardBody>
       </Card>
 
-      {/* Compliance Summary */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Compliance Summary</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatusStat label="Met" status="met" count={statusCount(compliance_matrix, "met")} />
-          <StatusStat label="Not Met" status="not_met" count={statusCount(compliance_matrix, "not_met")} />
-          <StatusStat label="Review Required" status="review_required" count={statusCount(compliance_matrix, "review_required")} />
-          <StatusStat label="Conditional" status="conditional" count={statusCount(compliance_matrix, "conditional")} />
-        </div>
-      </div>
-
-      {/* What's actually blocking this bid -- the one thing a business
-          stakeholder needs before reading rows of detail. */}
+      {/* What's actually blocking this bid -- the itemized detail behind
+          "Can we bid?" above. Unchanged from before this reorder. */}
       {blockingIssues.length > 0 && (
         <Card className="border-danger/30">
           <CardHeader
@@ -345,10 +364,42 @@ export default function Evaluation() {
         </Card>
       )}
 
-      {/* Compliance matrix / supporting evidence -- grouped by status
-          instead of one long flat scroll, requirement text leads every
-          row, raw matched evidence is tucked behind a "View evidence"
-          disclosure instead of printed in full for every single row. */}
+      {/* Business Decision -- moved up to immediately follow the blocking
+          section (docs/TENDER_JOURNEY_DESIGN.md §3): everything above is
+          AI Analysis, this is the human's own Business Decision. AI
+          advises, human decides. The Compliance Matrix -- Supporting
+          Evidence -- now follows this, not the other way around. */}
+      {mission && (
+        <BusinessDecisionPanel
+          mission={mission}
+          blockingRowCount={blockingRows.length}
+          mandatoryBlockerCount={blockingIssues.length}
+          recommendation={recommendation}
+          onDecisionRecorded={setMission}
+        />
+      )}
+
+      {/* Supporting Evidence -- Compliance Summary + Compliance Matrix,
+          grouped together and demoted below the decision
+          (docs/TENDER_JOURNEY_DESIGN.md §3). Not required reading for the
+          executive path above; this is where the analyst/compliance
+          officer verifies individual claims. */}
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Supporting Evidence</p>
+
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Compliance Summary</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatusStat label="Met" status="met" count={statusCount(compliance_matrix, "met")} />
+          <StatusStat label="Not Met" status="not_met" count={statusCount(compliance_matrix, "not_met")} />
+          <StatusStat label="Review Required" status="review_required" count={statusCount(compliance_matrix, "review_required")} />
+          <StatusStat label="Conditional" status="conditional" count={statusCount(compliance_matrix, "conditional")} />
+        </div>
+      </div>
+
+      {/* Compliance matrix -- grouped by status instead of one long flat
+          scroll, requirement text leads every row, raw matched evidence is
+          tucked behind a "View evidence" disclosure instead of printed in
+          full for every single row. */}
       <Card>
         <CardHeader
           title="Compliance Matrix"
@@ -406,17 +457,6 @@ export default function Evaluation() {
           )}
         </CardBody>
       </Card>
-
-      {/* Divider is deliberate (BID_DECISION_DESIGN.md §3): everything
-          above is AI Analysis, everything below is the human's own
-          Business Decision. AI advises, human decides. */}
-      {mission && (
-        <BusinessDecisionPanel
-          mission={mission}
-          blockingRowCount={blockingRows.length}
-          onDecisionRecorded={setMission}
-        />
-      )}
     </div>
   );
 }
@@ -601,10 +641,18 @@ const DECISION_OPTIONS: { value: BusinessDecision; label: string; icon: typeof C
 function BusinessDecisionPanel({
   mission,
   blockingRowCount,
+  mandatoryBlockerCount,
+  recommendation,
   onDecisionRecorded,
 }: {
   mission: MissionRead;
   blockingRowCount: number;
+  // Mandatory-and-not-met count (the "Can we bid?" / "What's Blocking
+  // This Bid" figure) -- distinct from blockingRowCount, which gates on
+  // unverified HIGH/CRITICAL compliance rows. Used only for the recap
+  // below, not for any gating logic (unchanged from before this reorder).
+  mandatoryBlockerCount: number;
+  recommendation: RecommendationRead;
   onDecisionRecorded: (mission: MissionRead) => void;
 }) {
   const { notify } = useToast();
@@ -662,6 +710,32 @@ function BusinessDecisionPanel({
           </div>
         ) : (
           <>
+            {/* Condensed recap -- three lines, no new data, sourced from
+                the recommendation and blocker count already on the page
+                above. So the decision-maker isn't relying on memory of
+                what they read several screens up (docs/
+                TENDER_JOURNEY_DESIGN.md §3). */}
+            <div className="rounded-md border border-border bg-muted/30 px-3.5 py-3 text-sm space-y-1">
+              <p>
+                <span className="text-muted-foreground">AI Recommendation: </span>
+                <span className="font-medium">{recommendationLabel(recommendation.recommendation_type)}</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Mandatory blockers: </span>
+                <span className="font-medium">
+                  {mandatoryBlockerCount === 0 ? "None" : mandatoryBlockerCount}
+                </span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Overall confidence: </span>
+                <span className="font-medium">
+                  {recommendation.overall_confidence != null
+                    ? `${Math.round(recommendation.overall_confidence * 100)}%`
+                    : "—"}
+                </span>
+              </p>
+            </div>
+
             <div className="flex flex-wrap gap-2">
               {DECISION_OPTIONS.map(({ value, label, icon: Icon }) => (
                 <button
@@ -687,6 +761,16 @@ function BusinessDecisionPanel({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
+
+            {selected && (
+              // Grounded in a verified backend fact, not a UX flourish: no
+              // reopen mechanism exists once a mission leaves
+              // awaiting_approval (docs/TENDER_JOURNEY_DESIGN.md §4) -- so
+              // this statement is literally true, not just emphatic.
+              <p className="text-xs text-muted-foreground">
+                This decision is final and cannot be changed within BidOps once saved.
+              </p>
+            )}
 
             <div className="flex justify-end">
               <Button onClick={handleSave} disabled={!selected} loading={saving}>
