@@ -21,6 +21,7 @@ import { forwardLookingGap } from "../lib/forwardLookingGap";
 import { rankBlockers } from "../lib/blockerPriority";
 import { groupBlockersByType } from "../lib/blockerGroups";
 import { assessmentClaim, assessmentConsequence } from "../lib/assessmentCopy";
+import { requirementCategory, REQUIREMENT_CATEGORY_LABELS } from "../lib/requirementCategory";
 import type {
   BusinessDecision,
   ComplianceMatrixEntryRead,
@@ -762,28 +763,44 @@ export default function Evaluation() {
         </Card>
       )}
 
-      {/* What would change this recommendation? -- forward-looking framing
-          of the same mandatory not-met gaps shown above, per
-          docs/TENDER_JOURNEY_DESIGN.md §6 ("cheap, buildable now" half
-          only -- template-based, no LLM prompt change). Sits between the
-          blockers and the decision itself: the last thing a decision-maker
-          reads before deciding. */}
-      {blockingIssues.length > 0 && (
+      {/* What Would It Take -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md
+          Phase 4, docs/TENDER_ASSESSMENT_REDESIGN.md §4/§8. Renamed from
+          "What Would Change This Recommendation?" -- the redesign doc's
+          confirmed name; "Path to Eligibility" was considered and
+          rejected as the tier's universal title (too narrow for
+          Conditional/Review cases) but remains valid as in-tier language
+          for the eligibility-failure case specifically. Forward-looking
+          framing of the same mandatory not-met gaps Why (above) explains,
+          per docs/TENDER_JOURNEY_DESIGN.md §6 ("cheap, buildable now" half
+          only -- template-based, no LLM prompt change) -- answers a
+          genuinely different question than Why (diagnosis vs. prognosis),
+          which is why it stays a distinct card rather than folding into
+          it. Each blocker also carries its Administrative/Structural
+          classification (requirementCategory.ts) -- a static label, never
+          a score or percentage, per the redesign doc's explicit
+          constraint (§5). Sits between the blockers and the decision
+          itself: the last thing a decision-maker reads before deciding. */}
+      {rankedBlockers.length > 0 && (
         <Card className="border-primary/20">
           <CardHeader
             title={
               <span className="flex items-center gap-2">
                 <Lightbulb size={15} className="text-primary" />
-                What Would Change This Recommendation?
+                What Would It Take
               </span>
             }
             description="What it would take to clear each mandatory blocker"
           />
           <CardBody className="!py-2">
             <ul className="divide-y divide-border -mx-6">
-              {blockingIssues.map((g) => (
+              {rankedBlockers.map((g) => (
                 <li key={g.requirement_id} className="px-6 py-3 text-sm">
-                  <p className="font-medium leading-relaxed">{g.description}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium leading-relaxed">{g.description}</p>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide shrink-0">
+                      {REQUIREMENT_CATEGORY_LABELS[requirementCategory(g.requirement_type)]}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{forwardLookingGap(g)}</p>
                 </li>
               ))}
