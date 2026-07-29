@@ -10,6 +10,7 @@ Short-form companion to `CORE_ARCHITECTURE.md`. Use this to evaluate every futur
 6. **Product value should compound.** The moat is accumulated data (Capability Graph, Requirement/Evidence/Verdict history, outcomes) — not prompts, not model choice.
 7. **Every feature must strengthen the moat.** If it doesn't improve quality, retention, knowledge, efficiency, explainability, trust, or differentiation, it's scope creep.
 8. **Every AI conclusion must be traceable.** Every Verdict answers "why" with evidence, not chain-of-thought.
+9. **Architecture evolves from evidence, not speculation.** New architectural complexity must be justified by production telemetry, customer feedback, measured performance bottlenecks, or repeated operational pain. Deferred ideas remain documented and are revisited only when supported by evidence — not because they "might be useful someday" or because another product implements them.
 
 **The single working test for any new idea:** does it enrich the Requirement → Evidence → Evaluation → Verdict lifecycle? If not, it doesn't belong yet, regardless of how compelling it sounds on its own.
 
@@ -19,3 +20,4 @@ Short-form companion to `CORE_ARCHITECTURE.md`. Use this to evaluate every futur
 - Never present a confidence or readiness number that isn't one specific, named, computable statistic.
 - External data sources are enhancements, never dependencies. Core product must work with all of them offline.
 - No feature ships on assumption where verification is possible and hasn't been done (e.g. external API access, ToS, competitor claims).
+- Architectural complexity is introduced only when supported by production evidence (telemetry, customer feedback, measured bottlenecks, or repeated operational pain).
