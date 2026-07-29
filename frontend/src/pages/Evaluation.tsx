@@ -29,8 +29,9 @@ import {
   Skeleton,
   Textarea,
 } from "../components/kit";
-import { AlertOctagon, Check, ChevronDown, RefreshCw, ShieldCheck, ShieldQuestion, TrendingUp, X } from "lucide-react";
+import { AlertOctagon, Check, ChevronDown, Lightbulb, RefreshCw, ShieldCheck, ShieldQuestion, TrendingUp, X } from "lucide-react";
 import { cn } from "../lib/cn";
+import { forwardLookingGap } from "../lib/forwardLookingGap";
 
 // The three real target values a human can verify a compliance row to --
 // "pending" is the starting state, never a target one (same rule the
@@ -357,6 +358,36 @@ export default function Evaluation() {
                     <Badge value="not_met" withIcon />
                   </div>
                   {g.reason && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{g.reason}</p>}
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* What would change this recommendation? -- forward-looking framing
+          of the same mandatory not-met gaps shown above, per
+          docs/TENDER_JOURNEY_DESIGN.md §6 ("cheap, buildable now" half
+          only -- template-based, no LLM prompt change). Sits between the
+          blockers and the decision itself: the last thing a decision-maker
+          reads before deciding. */}
+      {blockingIssues.length > 0 && (
+        <Card className="border-primary/20">
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                <Lightbulb size={15} className="text-primary" />
+                What Would Change This Recommendation?
+              </span>
+            }
+            description="What it would take to clear each mandatory blocker"
+          />
+          <CardBody className="!py-2">
+            <ul className="divide-y divide-border -mx-6">
+              {blockingIssues.map((g) => (
+                <li key={g.requirement_id} className="px-6 py-3 text-sm">
+                  <p className="font-medium leading-relaxed">{g.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{forwardLookingGap(g)}</p>
                 </li>
               ))}
             </ul>
