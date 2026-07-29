@@ -92,7 +92,9 @@ export function LandingNavbar() {
           <button
             onClick={() => {
               setActiveKey(null);
-              scrollToId("pricing");
+              // No dedicated pricing section exists on the page yet, so
+              // this scrolls to Contact instead of a dead anchor.
+              scrollToId("contact");
             }}
             className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-surface-hover"
           >
@@ -164,7 +166,9 @@ export function LandingNavbar() {
           ))}
           <button
             onClick={() => {
-              scrollToId("pricing");
+              // No dedicated pricing section exists on the page yet, so
+              // this scrolls to Contact instead of a dead anchor.
+              scrollToId("contact");
               setMobileOpen(false);
             }}
             className="w-full text-left rounded-md px-3 py-2.5 text-sm font-medium text-foreground/90"

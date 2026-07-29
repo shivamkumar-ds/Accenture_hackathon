@@ -5,7 +5,6 @@ import { extractErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { Button, Input, Logo } from "../components/kit";
-import { DashboardPreview } from "../components/landing/DashboardPreview";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, Users } from "lucide-react";
 
 const FORGOT_PASSWORD_MAILTO =
@@ -137,8 +136,14 @@ export default function Login() {
           aria-hidden="true"
           className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_50%_at_15%_25%,hsl(var(--primary)/0.08),transparent)]"
         />
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14 grid lg:grid-cols-[1.1fr_1fr] gap-12 items-start">
-          {/* Left: pitch + real dashboard preview */}
+        {/* No dashboard mockup on this page -- the homepage already shows
+            the real product; this side just needs to sell the "why," then
+            get out of the way of the form. items-center (not items-start)
+            keeps the shorter left column vertically centered against the
+            auth card now that the mockup is gone, rather than pinned to
+            the top with a growing gap beneath it. */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14 grid lg:grid-cols-[1.1fr_1fr] gap-12 items-center">
+          {/* Left: pitch */}
           <div className="hidden lg:block">
             <h1 className="font-display text-4xl font-bold tracking-tight text-foreground">
               {mode === "login" ? "Welcome Back!" : "Get Started"}
@@ -147,7 +152,7 @@ export default function Login() {
               {mode === "login" ? "Sign in to your BidOps account" : "Register your company to get started"}
             </p>
 
-            <div className="mt-8 space-y-5">
+            <div className="mt-10 space-y-6">
               {loginHighlights.map((h) => (
                 <div key={h.title} className="flex items-start gap-3.5">
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${h.color.bg} ${h.color.text}`}>
@@ -159,10 +164,6 @@ export default function Login() {
                   </div>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-10 max-w-md">
-              <DashboardPreview />
             </div>
           </div>
 

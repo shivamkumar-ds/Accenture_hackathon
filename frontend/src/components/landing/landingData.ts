@@ -21,10 +21,10 @@ import {
   BookOpen,
   FileText,
   HelpCircle,
-  Cloud,
   FileUp,
   Monitor,
   Users,
+  History,
 } from "lucide-react";
 
 // Content for the marketing landing page only -- lives here rather than
@@ -50,7 +50,7 @@ export const solutions: DropdownCard[] = [
       "Requirement extraction from raw tender PDFs, page by page",
       "Compliance matching against your capability records",
       "Evidence generation for every match, not just a verdict",
-      "An executive GO / NO-GO recommendation with a confidence score",
+      "An executive recommendation — Proceed, Proceed with Conditions, Review, or Do Not Proceed — with a confidence score",
     ],
   },
   {
@@ -67,7 +67,7 @@ export const solutions: DropdownCard[] = [
   {
     icon: FileBarChart2,
     title: "Executive Reports",
-    description: "Generate executive-ready GO / NO-GO reports with transparent evidence.",
+    description: "Generate an executive-ready Tender Assessment — recommendation, evidence, and audit trail in one place.",
     details: [
       "A one-page decision summary for leadership review",
       "The full compliance matrix behind the recommendation",
@@ -77,12 +77,12 @@ export const solutions: DropdownCard[] = [
   },
   {
     icon: Workflow,
-    title: "Enterprise Workspace",
-    description: "Manage tenders from upload to final recommendation.",
+    title: "Tender Workspace",
+    description: "Manage every tender from upload through Tender Assessment to a recorded Business Decision.",
     details: [
       "A shared workspace per tender, from first upload to final call",
       "Status tracking across every stage of the evaluation",
-      "An approval pipeline before a recommendation is finalized",
+      "A recorded Business Decision with a full Decision History audit trail",
       "Company-scoped access so tenants never see each other's data",
     ],
   },
@@ -134,25 +134,27 @@ export const features: FeatureCard[] = [
   {
     icon: ShieldCheck,
     title: "Compliance Matrix",
-    description: "Maps requirements against your capabilities and shows compliance status with evidence references.",
+    description: "An evidence-backed, requirement-by-requirement compliance status view built for executive review.",
     category: "Decision Intelligence",
     color: { bg: "bg-violet-50", text: "text-violet-600" },
     details: [
       "Requirement-by-requirement compliance status, not just a summary score",
       "Every status links to the capability record used as evidence",
       "Flags partial or conditional matches, not just yes/no",
+      "Lives inside the Tender Assessment's Evidence view, ready for executive review alongside confidence scoring",
     ],
   },
   {
     icon: Gauge,
-    title: "GO / NO-GO Recommendation",
-    description: "AI-powered decision engine provides a clear GO / NO-GO with confidence score and risk assessment.",
+    title: "Explainable Tender Assessment",
+    description: "The Decision Engine provides a clear recommendation — Proceed, Proceed with Conditions, Review, or Do Not Proceed — with confidence scoring and risk assessment.",
     category: "Decision Intelligence",
     color: { bg: "bg-orange-50", text: "text-orange-600" },
     details: [
       "A single executive recommendation backed by the full compliance matrix",
       "Confidence score broken down by document, entity, and matching stage",
       "Every verdict is paired with a written reason, not a black-box score",
+      "Organized as a focused workspace — Overview, Analysis, Decision, and Evidence",
     ],
   },
   {
@@ -170,19 +172,19 @@ export const features: FeatureCard[] = [
   {
     icon: FileSearch,
     title: "Gap Analysis",
-    description: "Identifies missing documents, certifications, and capabilities that may affect your eligibility or score.",
+    description: "Classifies every gap as Administrative or Structural, with what it would take to reach eligibility.",
     category: "Capability Management",
     color: { bg: "bg-rose-50", text: "text-rose-600" },
     details: [
       "Surfaces every unmet or at-risk requirement in one place",
-      "Distinguishes missing evidence from genuinely unmet criteria",
-      "Gives the bid team a concrete list to act on before submission",
+      "Classifies each gap as Administrative (closable, e.g. certification or experience) or Structural (a fixed eligibility rule or deadline)",
+      "Gives the bid team a concrete list of what it would take to reach eligibility before submission",
     ],
   },
   {
     icon: Lock,
     title: "Evidence Management",
-    description: "Attach and manage supporting documents with clause-level mapping and validity tracking.",
+    description: "The evidence mapping inside Tender Assessment — every requirement linked to its supporting document.",
     category: "Collaboration & Reports",
     color: { bg: "bg-sky-50", text: "text-sky-600" },
     details: [
@@ -194,13 +196,14 @@ export const features: FeatureCard[] = [
   {
     icon: FileBarChart2,
     title: "Reports & Dashboards",
-    description: "Generate executive-ready reports and track performance across tenders and teams.",
+    description: "Export an executive PDF and keep a fully auditable Decision History across every tender.",
     category: "Collaboration & Reports",
     color: { bg: "bg-purple-50", text: "text-purple-600" },
     details: [
       "Executive summary, confidence breakdown, and full compliance matrix",
-      "One-click PDF export for offline circulation",
+      "One-click executive PDF export for offline circulation",
       "Written for a non-technical reader, not just the bid team",
+      "Every mission keeps a full Decision History — every verification and business decision, timestamped and attributed for auditability",
     ],
   },
 ];
@@ -355,7 +358,7 @@ export const howItWorks: DropdownCard[] = [
   {
     icon: FileBarChart2,
     title: "4. Decide",
-    description: "Get an explainable GO / NO-GO recommendation with a full evidence trail, exportable as a report.",
+    description: "Get an explainable Tender Assessment with a full evidence trail, exportable as a report.",
     details: [
       "Executive summary, confidence breakdown, and full compliance matrix",
       "Every verdict is paired with a written reason, not a black-box score",
@@ -409,21 +412,21 @@ export const processSteps: ProcessStep[] = [
     step: 5,
     icon: Gauge,
     title: "AI Matches & Evaluates",
-    description: "Our Decision Engine matches tender requirements with your capabilities and evaluates compliance.",
+    description: "Our Decision Engine matches requirements against your capabilities and builds the Compliance Matrix.",
     color: { bg: "bg-sky-50", text: "text-sky-600" },
   },
   {
     step: 6,
     icon: FileSearch,
-    title: "Evidence & Gap Analysis",
-    description: "Review matched evidence for each requirement and identify gaps with recommended actions.",
+    title: "Tender Assessment",
+    description: "Review the AI assessment — Overview, Analysis, Decision, and Evidence — and the supporting evidence behind it.",
     color: { bg: "bg-purple-50", text: "text-purple-600" },
   },
   {
     step: 7,
     icon: FileBarChart2,
-    title: "Get Decision & Report",
-    description: "Get an evidence-backed GO / NO-GO recommendation with a comprehensive report.",
+    title: "Record Business Decision & Export Report",
+    description: "Record the organization's decision, preserve it in Decision History, and export an executive PDF report.",
     color: { bg: "bg-teal-50", text: "text-teal-600" },
   },
 ];
@@ -501,11 +504,18 @@ export const resources: ResourceItem[] = [
   { icon: Sparkles, title: "Release Notes", description: "What's new in BidOps, as it ships. Coming soon." },
 ];
 
+// Corrected per a content-accuracy pass: the previous "Google AI Powered"
+// and "Hosted on Google Cloud" statements were stale -- OpenAI is the
+// operational default provider today (Vertex/Gemini is the strategic,
+// not-yet-primary path, per backend/app/core/config.py), and there is no
+// production deployment yet (docs/DEPLOYMENT.md), so neither claim is
+// true right now. Replaced with statements grounded in what's actually
+// implemented and tested (multi-tenancy isolation, Decision History).
 export const trustStatements: { icon: LucideIcon; label: string }[] = [
   { icon: ShieldCheck, label: "Enterprise Grade Security" },
-  { icon: Lock, label: "End-to-End Encryption" },
-  { icon: Sparkles, label: "Google AI Powered" },
-  { icon: Cloud, label: "Hosted on Google Cloud" },
+  { icon: Lock, label: "Multi-Tenant Data Isolation" },
+  { icon: Sparkles, label: "AI-Powered Evaluation" },
+  { icon: History, label: "Audit-Ready Decision Trail" },
   { icon: Briefcase, label: "Designed for Procurement Teams" },
   { icon: FileSearch, label: "Explainable AI Decisions" },
 ];

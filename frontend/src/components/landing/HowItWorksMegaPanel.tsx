@@ -28,7 +28,7 @@ export function HowItWorksMegaPanel() {
         </h2>
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
           BidOps follows a proven, AI-powered workflow to evaluate tenders, assess your capabilities, and deliver
-          clear, evidence-backed recommendations.
+          a clear, evidence-backed Tender Assessment.
         </p>
       </div>
 
@@ -72,11 +72,10 @@ export function HowItWorksMegaPanel() {
           <div className="space-y-1.5">
             {[
               ["Certifications", 24],
-              ["Past Projects", 18],
-              ["Work Orders", 32],
+              ["Projects", 18],
               ["Personnel", 125],
               ["Equipment", 46],
-              ["Financials", 12],
+              ["Financial Records", 12],
             ].map(([label, count]) => (
               <div key={label} className="flex items-center gap-1.5 text-[9px]">
                 <CheckCircle2 size={10} className="text-success shrink-0" />
@@ -103,11 +102,11 @@ export function HowItWorksMegaPanel() {
         <PreviewCard title="Extracted Requirements">
           <div className="space-y-1.5">
             {[
-              ["Technical Requirements", 156],
-              ["Financial Requirements", 42],
-              ["Eligibility Criteria", 28],
-              ["Compliance Clauses", 63],
-              ["Commercial Terms", 31],
+              ["Technical", 156],
+              ["Eligibility", 28],
+              ["Certification", 42],
+              ["Experience", 24],
+              ["Submission", 33],
             ].map(([label, count]) => (
               <div key={label} className="flex items-center justify-between text-[9px]">
                 <span className="text-foreground/80 truncate">{label}</span>
@@ -116,7 +115,7 @@ export function HowItWorksMegaPanel() {
             ))}
             <div className="flex items-center justify-between text-[9px] font-semibold pt-1.5 mt-1 border-t border-border">
               <span>Total Extracted</span>
-              <span className="text-primary">320</span>
+              <span className="text-primary">283</span>
             </div>
           </div>
         </PreviewCard>
@@ -134,7 +133,7 @@ export function HowItWorksMegaPanel() {
               <span className="text-[10px] font-bold text-success">78%</span>
             </div>
           </div>
-          <p className="text-center text-[8px] text-muted-foreground mb-2">Overall Match</p>
+          <p className="text-center text-[8px] text-muted-foreground mb-2">Overall Confidence</p>
           <div className="space-y-1 text-[9px]">
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
@@ -157,26 +156,26 @@ export function HowItWorksMegaPanel() {
         <PreviewCard title="Top Gaps">
           <div className="space-y-1.5 mb-2">
             {[
-              ["ISO 14001 Certificate", "High", "text-danger bg-danger-soft"],
-              ["Average Annual Turnover", "Medium", "text-warning bg-warning-soft"],
-              ["Similar Project Experience", "Low", "text-muted-foreground bg-muted"],
-            ].map(([label, risk, cls]) => (
+              ["ISO 14001 Certificate", "Administrative", "text-warning bg-warning-soft"],
+              ["Minimum Annual Turnover", "Structural", "text-danger bg-danger-soft"],
+              ["Similar Project Experience", "Administrative", "text-warning bg-warning-soft"],
+            ].map(([label, category, cls]) => (
               <div key={label} className="flex items-center justify-between gap-1 text-[9px]">
                 <span className="text-foreground/80 truncate">{label}</span>
-                <span className={cn("text-[8px] font-medium rounded px-1 py-0.5 shrink-0", cls)}>{risk}</span>
+                <span className={cn("text-[8px] font-medium rounded px-1 py-0.5 shrink-0", cls)}>{category}</span>
               </div>
             ))}
           </div>
           <p className="text-[9px] font-medium text-primary">View all gaps →</p>
         </PreviewCard>
 
-        <PreviewCard title="Recommendation">
-          <div className="rounded-md bg-success-soft py-2.5 text-center mb-2">
-            <p className="text-lg font-bold text-success leading-none">GO</p>
-            <p className="text-[8px] text-success/80 mt-1">High Probability of Success</p>
+        <PreviewCard title="Tender Assessment">
+          <div className="rounded-md bg-success-soft py-2 text-center mb-2">
+            <p className="text-[11px] font-bold text-success leading-tight">Proceed</p>
+            <p className="text-[8px] text-success/80 mt-1">High Confidence</p>
           </div>
           <div className="space-y-1 text-[9px] font-medium text-primary">
-            <p>View Full Report</p>
+            <p>Record Business Decision</p>
             <p>Export PDF</p>
           </div>
         </PreviewCard>

@@ -11,7 +11,7 @@ const pills = [
   { icon: FileSearch, title: "AI Requirement Extraction", description: "Automatically extract tender requirements using AI." },
   { icon: Layers, title: "Capability Intelligence", description: "Build a reusable capability library from company documents." },
   { icon: ShieldCheck, title: "Evidence-backed Decisions", description: "Every recommendation links directly to supporting evidence." },
-  { icon: FileBarChart2, title: "Executive Reports", description: "Generate procurement-ready decision reports in minutes." },
+  { icon: FileBarChart2, title: "Executive Reports", description: "Export an executive-ready Tender Assessment PDF in minutes." },
 ];
 
 const footerLinks = {
@@ -73,12 +73,12 @@ export default function Landing() {
             </p>
           </div>
 
-          {/* Sticky so the mockup stays pinned near the top of the
-              viewport while the (taller) left column scrolls past it,
-              instead of ending early and leaving a block of empty white
-              space beneath a short card -- the actual bug being fixed
-              here, not just cosmetic centering. */}
-          <div className="lg:sticky lg:top-24">
+          {/* Plain top alignment (no sticky) -- sticky positioning let the
+              card visually drift past its own row's bottom edge while
+              scrolling and overlap the pills row beneath it. Static
+              placement keeps it pinned to the top of the row, level with
+              the headline, with no overlap risk. */}
+          <div>
             <DashboardPreview />
           </div>
 
