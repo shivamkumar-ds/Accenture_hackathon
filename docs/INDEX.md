@@ -62,8 +62,9 @@ when working on that feature again, not general-purpose reference.
 | `BID_DECISION_DESIGN.md` | Bid Decision feature design note |
 | `COMPLIANCE_VERIFICATION_UI_NOTE.md` | Compliance Verification UI design note |
 | `COMPLIANCE_VERIFICATION_UI_IMPLEMENTATION_PLAN.md` | Compliance Verification UI implementation plan |
-| `TENDER_JOURNEY_DESIGN.md` | Tender Journey & Business Decision experience design (frozen, not yet implemented) — the frontend product philosophy for the mission lifecycle |
-| `TENDER_JOURNEY_IMPLEMENTATION_PLAN.md` | Tender Journey implementation plan (proposed, awaiting review) — 7 phases derived from the design doc above |
+| `TENDER_JOURNEY_DESIGN.md` | Tender Journey & Business Decision experience design (frozen, implemented) — the frontend product philosophy for the mission lifecycle |
+| `TENDER_JOURNEY_IMPLEMENTATION_PLAN.md` | Tender Journey implementation plan (implemented — all 7 phases complete) — derived from the design doc above |
+| `TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md` | Append-only log of ideas/interpretations that surfaced during the 7-phase implementation but weren't built, per its own scope-discipline rule |
 
 ## Audit reports
 

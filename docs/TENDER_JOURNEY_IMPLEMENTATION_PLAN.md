@@ -1,10 +1,31 @@
 # Tender Journey — Implementation Plan (No Code)
 
-Status: **Proposed — awaiting review.** Derived strictly from
+Status: **Implemented — all 7 phases complete.** Derived strictly from
 `docs/TENDER_JOURNEY_DESIGN.md`, which is frozen. Nothing in this plan
-introduces a product idea not already recorded there — if implementation
-surfaces something new, it gets logged in §0's Deferred Enhancements Log,
-not folded into scope silently.
+introduced a product idea not already recorded there — anything that
+surfaced during implementation was logged in
+`docs/TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md` instead of folded into
+scope silently.
+
+Each phase landed as its own reviewed, verified, atomic commit, in
+order, with explicit approval between phases (Phase 4's route removal
+and Phase 6's additive backend field additionally required their own
+sign-off, per the flags below):
+
+| Phase | Commit | What |
+|---|---|---|
+| 1 | `9e361a0` | Vocabulary: "AI Decision" → "AI Recommendation" / "AI Analysis" |
+| 2 | `2273cac` | Reorder the mission page around the decision |
+| 3 | `bdb8606` | "What would change this recommendation?" |
+| 4 | `d7a3531` | Merge Requirements into the mission page (`TenderDetail.tsx` deleted) |
+| 5 | `99ac4ce` | Fold Reports into a "Download PDF Report" action |
+| 6 | `876f39e` | Decision History (additive `DecisionEventRead.user_name`) |
+| 7 | `5725e95` | Role-based default section |
+
+The frontend pass this plan scoped is now frozen. Per the agreed
+sequencing (`docs/TENDER_JOURNEY_DESIGN.md` §8), Authentication &
+Organization Onboarding is the next architecture discussion — not
+started here.
 
 ## 0. Scope Discipline (explicit rule for this pass)
 
