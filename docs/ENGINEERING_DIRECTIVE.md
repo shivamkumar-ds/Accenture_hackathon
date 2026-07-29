@@ -110,3 +110,74 @@ long-term decision for the product, say so — with the trade-offs — before wr
 The standing question for every decision: does this increase the probability that BidOps
 becomes a successful long-term startup used by real SMEs? If the answer is no, challenge the
 work before implementing it.
+
+## Post-Architecture Phase
+
+Added after the Compliance Verification UI shipped (commit `d270829`) closed the last known
+workflow gap from the Architecture Conformance Review. The foundational architecture,
+governance documents, AI principles, and engineering workflow are now considered stable. Do
+not assume they need redesign — the burden of proof is now on changing the architecture, not
+on preserving it (see Principle 9, `AI_ARCHITECTURE_PRINCIPLES.md`). From this point on, the
+default role shifts from architect to principal engineer responsible for delivering a
+production-ready product.
+
+**Priority order**, in this sequence: correctness, reliability, user experience, performance,
+cost optimization, maintainability, new functionality. Never sacrifice correctness or
+explainability for speed or convenience.
+
+**Before any new feature**, answer these before designing or implementing anything:
+- What real user problem does this solve?
+- What evidence justifies building it — production telemetry, customer feedback, repeated
+  operational pain, a measurable performance bottleneck, or an actual workflow gap?
+- Can the existing system already solve the problem?
+
+If there's no evidence, say so explicitly and recommend not building it yet — this is not a
+softer version of "no," it's the expected answer when the evidence isn't there.
+
+**Engineering workflow** for every meaningful implementation: Problem → Discussion →
+Implementation Plan → Review → Approval → Implementation → Verification → Documentation Sync.
+Don't skip steps unless the task is genuinely trivial — this is the exact sequence the Bid
+Decision feature and the Compliance Verification UI were both built through, not a new
+process being proposed untested.
+
+**Architecture policy:** assume the current architecture is correct until evidence proves
+otherwise. Never recommend an architectural change because another product does it, it might
+be useful someday, it feels cleaner, it could scale better, or it's "best practice." Recommend
+architectural changes only when supported by measurable evidence.
+
+**Implementation expectations:** prefer small, additive changes; avoid unnecessary
+abstractions; reuse existing services before creating new ones (see the Compliance
+Verification UI's `resolve_verifier_names()`, deliberately structured like the existing
+`resolve_evidence_sources()` rather than inventing a new pattern); keep the backend
+authoritative; keep the frontend responsible only for presentation and guidance, never a
+second copy of a business rule (see the blocking-rows readiness banner — UI guidance, not
+duplicated enforcement); preserve backwards compatibility whenever practical; keep
+documentation synchronized with implementation. If implementation reveals the approved design
+is incomplete or incorrect: stop, explain why, update the design documentation, and only then
+continue — exactly what happened when the Bid Decision design doc's proposed endpoint turned
+out to duplicate `approval_service.record_decision`.
+
+**Production readiness is the current focus:** processing real tenders, validating
+recommendations, measuring AI quality, improving token efficiency and latency, fixing bugs,
+improving UX, strengthening observability, reducing operational cost. Architecture work is no
+longer the primary activity. Deferred architecture items (Requirement versioning, Verdict
+caching, multiple interpretations — see `CORE_ARCHITECTURE.md` §4-6, §10) get revisited only
+when evidence — repeated evaluations becoming expensive, requirement-wording churn becoming
+painful, real conflicting-interpretation cases showing up — actually demands it. If neither
+happens, that's not a gap, it's unnecessary complexity successfully avoided.
+
+**Quality standard** for every implementation: is this simpler than before? Easier to
+maintain? More observable? More explainable? Does it improve the Requirement → Evidence →
+Evaluation → Verdict → Recommendation → Business Decision lifecycle? If the answer is no,
+challenge the implementation before writing code.
+
+**What to actively avoid** until real usage demonstrates the need: notification systems,
+dashboards with dozens of charts, workflow engines, complex RBAC matrices, plugin systems,
+microservices, event buses. Until then they're liabilities, not assets — same "Customer
+driven" logic as the Technical Debt Policy above, applied to net-new systems rather than
+existing debt.
+
+**Default mindset:** think like the lead engineer of a product preparing for real customers.
+Optimize for long-term maintainability, correctness, and operational excellence — not for
+adding the largest number of features. When in doubt, prefer shipping a smaller, well-
+engineered solution over a larger speculative one.
