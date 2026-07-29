@@ -112,12 +112,15 @@ export default function Missions() {
 
   const refresh = async () => {
     try {
-      const all = await listMissions();
-      // "Delete tender" = archive (see handleDelete) -- archived missions
-      // are a soft-deleted, hidden-from-active-views state, same as a
-      // deleted document/capability. list_missions() has no status
-      // filter, so this page (and Dashboard/Reports) filter client-side.
-      setMissions(all.filter((m) => m.status !== "archived"));
+      // Reports.tsx (a separate, duplicate browse view over this same
+      // list_missions() call) has been retired -- Tender Workspace is now
+      // the single place all missions live, including archived ones, which
+      // were previously invisible everywhere in the app once "deleted."
+      // Full list is kept in state; archived rows are excluded from the
+      // default view (not the fetch) via visibleMissions below, so
+      // selecting the "Archived" filter can reveal them without a second
+      // fetch or a backend status filter (list_missions() has none).
+      setMissions(await listMissions());
     } catch (err) {
       notify("error", extractErrorMessage(err));
     } finally {
@@ -140,10 +143,13 @@ export default function Missions() {
   const orderById = new Map(missions.map((m, i) => [m.id, total - i]));
 
   // Search + status filter + sort are purely client-side over the already-
-  // fetched, already-archived-filtered list -- no new backend query params
-  // needed since list_missions() already returns everything this page uses.
+  // fetched list -- no new backend query params needed since
+  // list_missions() already returns everything this page uses. "All"
+  // means "everything actively in play" and still excludes archived, same
+  // default behavior as before this consolidation -- archived rows only
+  // appear when a user deliberately selects the "Archived" filter.
   const visibleMissions = missions
-    .filter((m) => statusFilter === "all" || m.status === statusFilter)
+    .filter((m) => (statusFilter === "all" ? m.status !== "archived" : m.status === statusFilter))
     .filter((m) => tenderDisplayName(m).toLowerCase().includes(search.trim().toLowerCase()))
     .slice()
     .sort((a, b) => {
@@ -166,7 +172,12 @@ export default function Missions() {
   };
 
   const handleDelete = async (missionId: string, name: string) => {
-    if (!confirm(`Delete "${name}"? It will be removed from Tender Workspace, Dashboard, and Reports.`)) return;
+    if (
+      !confirm(
+        `Delete "${name}"? It will be hidden from the default Tender Workspace view and Dashboard -- you can still find it later using the Archived filter here.`
+      )
+    )
+      return;
     setArchivingId(missionId);
     try {
       await archiveMission(missionId);
@@ -212,6 +223,7 @@ export default function Missions() {
                 <option value="running">AI Processing</option>
                 <option value="awaiting_approval">Awaiting Approval</option>
                 <option value="completed">Completed</option>
+                <option value="archived">Archived</option>
               </Select>
             </div>
             <div className="w-44">
@@ -294,13 +306,20 @@ export default function Missions() {
                         <MenuItem icon={<ExternalLink size={14} />} onClick={() => navigate(`/missions/${m.id}`)}>
                           Open
                         </MenuItem>
-                        <MenuItem
-                          icon={<Trash2 size={14} />}
-                          danger
-                          onClick={() => handleDelete(m.id, tenderDisplayName(m))}
-                        >
-                          {archivingId === m.id ? "Deleting…" : "Delete"}
-                        </MenuItem>
+                        {/* Already-archived rows have nothing left to
+                            delete -- Delete only makes sense from an
+                            active/visible state, so it's hidden rather
+                            than left as a no-op or a re-archive action
+                            nothing in the backend actually supports. */}
+                        {m.status !== "archived" && (
+                          <MenuItem
+                            icon={<Trash2 size={14} />}
+                            danger
+                            onClick={() => handleDelete(m.id, tenderDisplayName(m))}
+                          >
+                            {archivingId === m.id ? "Deleting…" : "Delete"}
+                          </MenuItem>
+                        )}
                       </Menu>
                     </div>
                   </div>

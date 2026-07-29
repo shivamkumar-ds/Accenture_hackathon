@@ -11,7 +11,6 @@ import Capabilities from "./pages/Capabilities";
 import TenderUpload from "./pages/TenderUpload";
 import Missions from "./pages/Missions";
 import Evaluation from "./pages/Evaluation";
-import Reports from "./pages/Reports";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { isAuthenticated } = useAuth();
@@ -45,7 +44,16 @@ function AppRoutes() {
         <Route path="/tenders/new" element={<TenderUpload />} />
         <Route path="/missions" element={<Missions />} />
         <Route path="/missions/:missionId" element={<Evaluation />} />
-        <Route path="/reports" element={<Reports />} />
+        {/* Reports.tsx retired -- it was a strictly smaller, less capable
+            duplicate view over the same list_missions() data Tender
+            Workspace already fully contains (Tender Workspace already
+            lists every non-archived mission at every status; Reports only
+            ever showed the subset with a recommendation_id, with no
+            actions beyond Open). Redirected rather than dropped through
+            the catch-all so any existing bookmark or external link to
+            /reports still lands somewhere useful instead of the
+            dashboard. */}
+        <Route path="/reports" element={<Navigate to="/missions" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

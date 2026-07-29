@@ -19,7 +19,7 @@ export function DashboardPreview() {
             <div className="flex items-center gap-2 rounded-md bg-primary/10 text-primary px-2.5 py-1.5 text-[11px] font-medium">
               <LayoutDashboard size={12} /> Dashboard
             </div>
-            {["Documents", "Capabilities", "Tender Workspace", "Reports"].map((label) => (
+            {["Documents", "Capabilities", "Upload Tender", "Tender Workspace"].map((label) => (
               <div key={label} className="rounded-md px-2.5 py-1.5 text-[11px] text-muted-foreground">
                 {label}
               </div>

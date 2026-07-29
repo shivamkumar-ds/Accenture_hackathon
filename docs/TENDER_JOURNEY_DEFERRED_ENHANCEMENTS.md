@@ -84,12 +84,17 @@ surfaced it, what it is, why it wasn't just done anyway.
   (`reportable = missions.filter(m => m.recommendation_id)`,
   `Reports.tsx`) deliberately includes `awaiting_approval` missions, not
   just `completed` ones — "Completed Assessments" would reintroduce the
-  exact wrong implication an earlier fix removed. Not implemented here:
-  out of scope for the Tender Assessment redesign document, which covers
-  the mission page only, not `Reports.tsx`. Revisit if/when Reports itself
-  gets its own design pass. Added on final review: "Tender Workspace" and
-  "Tender Library" would read as a coherent navigation pair in a way
-  "Tender Workspace" and "Reports" currently don't — "Reports" sounds like
-  a PDF export feature, "Tender Library" sounds like institutional memory,
-  which is closer to what the page actually became after Phase 5. Worth
-  weighing alongside the rename itself when Reports gets its own pass.
+  exact wrong implication an earlier fix removed.
+
+  **Superseded, not implemented as a rename.** When Reports finally got
+  its own design pass (the navigation-architecture review), the finding
+  was stronger than a naming problem: `Reports.tsx`'s dataset was a
+  strict subset of what `Missions.tsx` (Tender Workspace) already fully
+  contained, rendered with fewer actions (no delete, no re-run) for no
+  functional reason — genuine duplicate responsibility, not just an
+  unclear label. Resolved by retiring `Reports.tsx` entirely rather than
+  renaming it: Tender Workspace is now the single place all missions
+  live (including a newly-added "Archived" filter, previously invisible
+  everywhere), and the only remaining entry point into Tender Assessment.
+  `/reports` redirects to `/missions`. "Tender Library" as a name is
+  moot now that there's only one page to name.

@@ -9,8 +9,11 @@ import type { ComplianceMatrixEntryRead, GapAnalysisEntry } from "../api/types";
 // there's nothing to flag), `notes` is already a well-written one-line
 // justification, so it's the next best heading -- `supporting_evidence`
 // (the raw matched record) is demoted to a collapsible detail either way.
-// Shared between the Decision Engine page and the Reports page so both
-// render/export the same requirement text instead of two divergent copies.
+// Used by the mission page (Evaluation.tsx) and its PDF export
+// (lib/pdfReport.ts) so both render the same requirement text instead of
+// two divergent copies. (Reports.tsx, an earlier separate consumer, was
+// retired as a duplicate browse view over the same mission data --
+// see docs/TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md.)
 export function mergeRequirementContext(matrix: ComplianceMatrixEntryRead[], gaps: GapAnalysisEntry[]) {
   const byRequirement = new Map<string, GapAnalysisEntry>();
   gaps.forEach((g) => byRequirement.set(g.requirement_id, g));

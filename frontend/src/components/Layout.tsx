@@ -6,7 +6,6 @@ import {
   Layers,
   FileUp,
   Radar,
-  FileBarChart2,
   LogOut,
   Menu as MenuIcon,
   X,
@@ -25,8 +24,10 @@ const navItems = [
   { to: "/documents", label: "Documents", icon: FileStack },
   { to: "/capabilities", label: "Capabilities", icon: Layers },
   { to: "/tenders/new", label: "Upload Tender", icon: FileUp },
+  // Reports retired -- Tender Workspace is now the single place all
+  // tenders live (active and archived, via its status filter), so it's
+  // also the only remaining entry point into a mission's Tender Assessment.
   { to: "/missions", label: "Tender Workspace", icon: Radar },
-  { to: "/reports", label: "Reports", icon: FileBarChart2 },
 ];
 
 export default function Layout() {

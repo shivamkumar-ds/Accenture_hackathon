@@ -22,7 +22,6 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  FileBarChart2,
   FileSearch,
   FileUp,
   Layers,
@@ -58,18 +57,17 @@ export default function Dashboard() {
   const loadMissions = async () => {
     // Archived (= deleted, see Missions.tsx's "delete tender" -> archive_mission)
     // missions are excluded from every Dashboard view -- stat cards, Recent
-    // Tenders, Ongoing Analysis, Recent Activity -- same as Tender Workspace
-    // and Reports. list_missions() has no status filter, applied client-side.
+    // Tenders, Ongoing Analysis, Recent Activity -- same as Tender Workspace's
+    // default view. list_missions() has no status filter, applied client-side.
     const missionList = (await listMissions()).filter((m) => m.status !== "archived");
     setMissions(missionList);
 
     // A mission is "reportable"/evaluated as soon as the Decision Engine has
-    // produced a recommendation_id -- same definition Reports.tsx uses.
-    // Mission status itself normally sits at "awaiting_approval" at that
-    // point (there's no in-app approve/complete action yet), so gating this
-    // on status === "completed" was undercounting every evaluation that had
-    // a real, ready report -- that was the Evaluations/Reports stat cards
-    // showing 0 with a report already available.
+    // produced a recommendation_id. Mission status itself normally sits at
+    // "awaiting_approval" at that point (there's no in-app approve/complete
+    // action yet), so gating this on status === "completed" was undercounting
+    // every evaluation that had a real, ready report -- that was the
+    // Evaluations stat card showing 0 with a report already available.
     const reportable = missionList.filter((m) => m.recommendation_id);
     const results = await Promise.all(
       reportable.map(async (m) => ({ mission: m, evaluation: await getEvaluation(m.id) }))
@@ -165,10 +163,17 @@ export default function Dashboard() {
         <p className="text-sm text-muted-foreground mt-1">Here's what's happening with your tenders today.</p>
       </div>
 
+      {/* 4 cards, not 5 -- "Evaluations" and the former "Reports" card both
+          showed evaluations.length with different icons/tones and both
+          linked to the now-retired Reports page; that was the same
+          duplicate-responsibility problem the nav consolidation fixed one
+          level up, just visible here as two stat tiles instead of two
+          pages. Kept "Evaluations" (clearer label), dropped the other,
+          repointed to Tender Workspace. */}
       {loading ? (
         <SkeletonStatRow />
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
             label="Tenders"
             value={missions.length}
@@ -184,7 +189,7 @@ export default function Dashboard() {
             icon={<CheckCircle2 size={16} />}
             tone="success"
             trend="Completed"
-            linkTo="/reports"
+            linkTo="/missions"
             linkLabel="View all evaluations"
           />
           <StatCard
@@ -195,15 +200,6 @@ export default function Dashboard() {
             trend="Capabilities Extracted"
             linkTo="/capabilities"
             linkLabel="View library"
-          />
-          <StatCard
-            label="Reports"
-            value={evaluations.length}
-            icon={<FileBarChart2 size={16} />}
-            tone="warning"
-            trend="Reports Available"
-            linkTo="/reports"
-            linkLabel="View all reports"
           />
           <StatCard
             label="Critical Gaps"
