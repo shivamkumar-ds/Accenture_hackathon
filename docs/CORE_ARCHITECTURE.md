@@ -58,7 +58,9 @@ When a tender's summary and its detailed annexure state conflicting values for t
 
 ## 6. Caching Strategy
 
-Cache at the level of the atomic object, not the document. A Verdict is cached keyed on (requirement-pattern hash, evidence hash) — not on the tender document as a whole. Government tenders from the same department frequently reuse near-identical requirement templates; once a Verdict has been computed for "does this company hold ISO 9001" against the company's current evidence, a structurally similar requirement appearing in a different tender should reuse that Verdict rather than trigger fresh reasoning. This is finer-grained and more reusable than whole-document caching, and it falls directly out of treating Requirement-Evidence-Verdict as the true atomic unit.
+Cache at the level of the atomic object, not the document. A Verdict is cached keyed on (requirement-pattern hash, evidence hash, **evaluation logic version**) — not on the tender document as a whole. Government tenders from the same department frequently reuse near-identical requirement templates; once a Verdict has been computed for "does this company hold ISO 9001" against the company's current evidence, a structurally similar requirement appearing in a different tender should reuse that Verdict rather than trigger fresh reasoning.
+
+The evaluation-logic-version component is not optional. Without it, improving the matching prompt or algorithm would silently continue serving Verdicts reasoned under the old logic — a correctness bug, not a performance tradeoff, and exactly the staleness failure mode Principle 3 exists to prevent, one layer deeper than where it was first defined. Any change to how Evaluation reasons bumps the version and invalidates affected cache entries.
 
 ## 7. Human-in-the-Loop
 
@@ -82,4 +84,7 @@ Explicitly peripheral to the atomic object, useful but not architecturally centr
 - **Per-Verdict outcome attribution** — recording which specific gap actually mattered to a real win/loss, not just a whole-decision note.
 - **Udyam registration verification** — the one external integration with a solid, trustworthy, purpose-built API foundation confirmed by research; low AI cost, direct UX value.
 - **Requirement composite structure** (constraint / condition / context / priority) — directionally correct, exact schema to be validated against real extracted requirements before being frozen.
+- **Claim as a pre-classification step** (Claim → Classify → Requirement) — extraction currently assumes every extracted clause is already a Requirement. A more honest sequence treats extraction as producing unclassified Claims first, only some of which become Requirements — opening the door to modeling other clause types (payment terms, penalties, deliverables) the pipeline currently discards. Worth exploring once real tender variety justifies it, not adopting now.
+- **Evaluation as its own sub-engine** (deterministic checks / semantic checks / policy checks / human review, as distinct stages) — a plausible future shape once evidence source variety genuinely grows beyond the current five capability types. Do not pre-build this structure for hypothetical scale; let it emerge from real evaluation types that actually recur.
+- **Business-decision factors** (financial worth, execution capacity, customer relationship, risk appetite) are explicitly out of the Requirement-Evidence-Verdict engine — they are not evidence-evaluable claims. They belong as human-authored rationale captured at the Business Decision layer (see Bid Decision design), never scored or modeled by AI.
 - Still unresolved, pending manual verification, not assumption: whether GeM/CPPP data access is stable and ToS-compliant enough to build on.
