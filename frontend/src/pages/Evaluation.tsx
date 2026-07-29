@@ -661,23 +661,26 @@ export default function Evaluation() {
                     unchanged from the frozen redesign's five tiers; what
                     changed is that the reader now navigates between them
                     instead of scrolling through all of them at once.
-                    Deliberately a different visual language (underlined
-                    tabs, smaller text) than the pill-style FilterChip
-                    switcher above (Requirements / Tender Assessment /
-                    Decision History) -- two levels of navigation need two
-                    distinct visual weights, or this just becomes six flat
-                    tabs and recreates the same problem one layer down. */}
-                <div className="flex items-center gap-1 border-b border-border">
+                    Segmented-control styling (filled active pill inside a
+                    bounded track) reads as application navigation rather
+                    than page links -- deliberately still a different
+                    visual language from the pill-style FilterChip switcher
+                    above (Requirements / Tender Assessment / Decision
+                    History), which is borderless and full-width: two
+                    levels of navigation need two distinct visual
+                    treatments, or this becomes six flat tabs and recreates
+                    the same problem one layer down. */}
+                <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-1">
                   {ASSESSMENT_TABS.map((t) => (
                     <button
                       key={t.value}
                       type="button"
                       onClick={() => setAssessmentTab(t.value)}
                       className={cn(
-                        "px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                        "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
                         assessmentTab === t.value
-                          ? "border-primary text-foreground"
-                          : "border-transparent text-muted-foreground hover:text-foreground"
+                          ? "bg-surface text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {t.label}
@@ -876,6 +879,17 @@ export default function Evaluation() {
                         </CardBody>
                       </Card>
                     )}
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setAssessmentTab("decision")}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-brand-accent hover:underline"
+                      >
+                        Proceed to Decision
+                        <ArrowRight size={14} />
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -884,9 +898,12 @@ export default function Evaluation() {
                     than the fourth card in a scroll. Decision History
                     stays a separate top-level section, not merged --
                     per the redesign doc's explicit constraint and this
-                    iteration's own -- the link below is a navigation
-                    shortcut into that existing section, not a duplicate of
-                    its content. */}
+                    iteration's own -- "View Decision History" is a
+                    navigation shortcut into that existing section, not a
+                    duplicate of its content, so it's kept visually
+                    secondary to "View Evidence," which continues the same
+                    guided Overview -> Analysis -> Decision -> Evidence
+                    path the other three tabs' CTAs already follow. */}
                 {assessmentTab === "decision" && (
                   <div className="space-y-4">
                     {mission && (
@@ -898,15 +915,24 @@ export default function Evaluation() {
                         onDecisionRecorded={setMission}
                       />
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setSection("history")}
-                      className="inline-flex items-center gap-1 text-sm font-medium text-brand-accent hover:underline"
-                    >
-                      <History size={14} />
-                      View Decision History
-                      <ArrowRight size={14} />
-                    </button>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSection("history")}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      >
+                        <History size={13} />
+                        View Decision History
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAssessmentTab("evidence")}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-brand-accent hover:underline"
+                      >
+                        View Evidence
+                        <ArrowRight size={14} />
+                      </button>
+                    </div>
                   </div>
                 )}
 
