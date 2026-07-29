@@ -28,6 +28,7 @@ import type {
   RecommendationRead,
   RequirementType,
   TenderWithRequirements,
+  UserRole,
   VerificationDecision,
 } from "../api/types";
 import {
@@ -111,6 +112,39 @@ type MergedEntry = MergedComplianceEntry;
 // (already integrated into the AI Recommendation scroll by Phase 2).
 type MissionSection = "requirements" | "recommendation" | "history";
 
+// Role-based default section (TENDER_JOURNEY_IMPLEMENTATION_PLAN.md Phase
+// 7, docs/TENDER_JOURNEY_DESIGN.md §5's persona table). mission.status
+// (see refresh() below) determines what's actually possible to show; this
+// determines where a given role lands among what's available -- it never
+// overrides the "nothing to show yet" created/running case.
+//
+// Reviewer defaults to "recommendation," not a dedicated "Supporting
+// Evidence" section, because no such section exists: the Compliance Matrix
+// lives inside the AI Recommendation section (Phase 2 demoted it below the
+// Business Decision panel, not into its own tab) -- same reasoning already
+// recorded in docs/TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md's Phase 4 entry
+// for why Business Decision itself isn't a separate section either.
+//
+// Administrator is the design doc's own explicitly-flagged open question
+// ("where Administrator fits this table... worth confirming before
+// implementation"). Resolved here per the implementation plan's proposed
+// default -- same as Bid Manager, no fixed default -- rather than left
+// unimplemented; flagging the choice here rather than picking silently.
+function roleDefaultSection(role: UserRole | undefined): MissionSection | null {
+  switch (role) {
+    case "executive":
+      return "recommendation";
+    case "reviewer":
+      return "recommendation";
+    case "auditor":
+      return "history";
+    case "bid_manager":
+    case "administrator":
+    default:
+      return null;
+  }
+}
+
 export default function Evaluation() {
   const { missionId } = useParams<{ missionId: string }>();
   const { notify } = useToast();
@@ -156,14 +190,14 @@ export default function Evaluation() {
     try {
       const missionResult = await getMission(missionId);
       setMission(missionResult);
-      // Section default logic (TENDER_JOURNEY_IMPLEMENTATION_PLAN.md Phase
-      // 4): mission.status determines what's actually possible to show, so
-      // it also decides which section a fresh page load lands on.
-      // Role-based defaults layered on top of this are Phase 7, not this
-      // one.
-      setSection(
-        missionResult.status === "created" || missionResult.status === "running" ? "requirements" : "recommendation"
-      );
+      // Section default logic: mission.status (Phase 4) determines what's
+      // actually possible to show -- a created/running mission has nothing
+      // to recommend, verify, or audit yet, so it always lands on
+      // Requirements regardless of role. Once past that, role (Phase 7)
+      // determines where a given role lands among what's now available.
+      const statusDefault: MissionSection =
+        missionResult.status === "created" || missionResult.status === "running" ? "requirements" : "recommendation";
+      setSection(statusDefault === "requirements" ? "requirements" : roleDefaultSection(user?.role) ?? statusDefault);
 
       // Requirements data -- independent of whether the Decision Engine has
       // run. mission.tender_id should always be present once a tender
