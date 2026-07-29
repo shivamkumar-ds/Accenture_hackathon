@@ -1,6 +1,6 @@
 # Compliance Verification UI — Design Note
 
-Status: **Proposed, not implemented.** Written before any code, per the gap the Architecture Conformance Review surfaced: `record_decision()`'s blocking-row gate (`backend/app/services/approval_service.py:56-66,128-134`) has a working backend, `POST /compliance/{id}/verify` (`backend/app/api/v1/approval.py:36-52`), with no frontend UI at all. This note answers the six questions asked before writing that UI, grounded in what the backend already does — not proposing new backend behavior.
+Status: **Implemented.** Commit `d270829`. Written before any code, per the gap the Architecture Conformance Review surfaced: `record_decision()`'s blocking-row gate (`backend/app/services/approval_service.py:56-66,128-134`) had a working backend, `POST /compliance/{id}/verify` (`backend/app/api/v1/approval.py:36-52`), with no frontend UI at all. This note answers the six questions asked before writing that UI, grounded in what the backend already did — not proposing new backend behavior. See `COMPLIANCE_VERIFICATION_UI_IMPLEMENTATION_PLAN.md` for the as-built file list and its Amendments section for what changed between this note and the shipped code.
 
 ## 1. Where does the Verify button appear?
 

@@ -1,6 +1,6 @@
 # Compliance Verification UI — Implementation Plan (No Code)
 
-Status: **Plan only — no code written.** Follows `docs/COMPLIANCE_VERIFICATION_UI_NOTE.md`'s six answers, revised after a design discussion (see "Amendments" at the bottom) that changed five things before any code was written: row-expansion state moved to be local per row, the blocking calculation reframed as a UI-only readiness indicator with no duplicated business rule, the Verify button gated on mission status, and — the one real scope change — a small additive backend schema addition to expose the complete verification metadata (`verified_by`, `verified_by_name`, `verified_at`) in one shot rather than growing the API field-by-field later.
+Status: **Implemented.** Commit `d270829`. Follows `docs/COMPLIANCE_VERIFICATION_UI_NOTE.md`'s six answers, revised after a design discussion (see "Amendments" below) that changed five things before any code was written: row-expansion state moved to be local per row, the blocking calculation reframed as a UI-only readiness indicator with no duplicated business rule, the Verify button gated on mission status, and — the one real scope change — a small additive backend schema addition to expose the complete verification metadata (`verified_by`, `verified_by_name`, `verified_at`) in one shot rather than growing the API field-by-field later. Implementation matched this plan exactly — no further amendments were needed once code was written.
 
 ## Goal
 
