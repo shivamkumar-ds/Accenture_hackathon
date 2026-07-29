@@ -19,6 +19,7 @@ import { mergeRequirementContext, type MergedComplianceEntry } from "../lib/comp
 import { tenderDisplayName } from "../lib/tenderName";
 import { forwardLookingGap } from "../lib/forwardLookingGap";
 import { rankBlockers } from "../lib/blockerPriority";
+import { groupBlockersByType } from "../lib/blockerGroups";
 import { assessmentClaim, assessmentConsequence } from "../lib/assessmentCopy";
 import type {
   BusinessDecision,
@@ -324,6 +325,12 @@ export default function Evaluation() {
     () => rankBlockers(blockingIssues, data?.compliance_matrix ?? []),
     [blockingIssues, data]
   );
+
+  // docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 3 -- Why's grouped,
+  // severity-ranked view of the same blockers. Derived from rankedBlockers
+  // (already severity-sorted) so group order and in-group order both fall
+  // out of that single sort, not a second one.
+  const whyGroups = useMemo(() => groupBlockersByType(rankedBlockers), [rankedBlockers]);
 
   // UI-only readiness indicator, mirroring (not duplicating) the backend's
   // approval_service.get_blocking_rows() rule -- the backend remains the
@@ -706,31 +713,51 @@ export default function Evaluation() {
         </div>
       </div>
 
-      {/* What's actually blocking this bid -- the itemized detail behind
-          "Can we bid?" above. Unchanged from before this reorder. */}
-      {blockingIssues.length > 0 && (
+      {/* Why -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 3,
+          docs/TENDER_ASSESSMENT_REDESIGN.md §4. Replaces "What's Blocking
+          This Bid": groups every mandatory-and-not-met gap by
+          requirement_type, each group carrying a plain-language
+          consequence rather than a bare count, and orders both the groups
+          and the items within them by severity (blockerPriority.ts's
+          rankBlockers) -- a "Top Priorities" ordering, not just a
+          grouping. This is also the point where the former duplicate
+          between "What's Blocking This Bid" and "What Would Change This
+          Recommendation" stops being a duplicate: Why answers "why," the
+          next card ("What Would It Take," Phase 4) answers "what would it
+          take" -- a different question, per §2's "one question per
+          section" rule. */}
+      {whyGroups.length > 0 && (
         <Card className="border-danger/30">
           <CardHeader
             title={
               <span className="flex items-center gap-2">
                 <AlertOctagon size={15} className="text-danger" />
-                What's Blocking This Bid
+                Why
               </span>
             }
-            description={`${blockingIssues.length} mandatory requirement(s) not met`}
+            description={`${blockingIssues.length} mandatory requirement(s) not met, top priorities first`}
           />
-          <CardBody className="!py-2">
-            <ul className="divide-y divide-border -mx-6">
-              {blockingIssues.map((g) => (
-                <li key={g.requirement_id} className="px-6 py-3 text-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="font-medium leading-relaxed">{g.description}</span>
-                    <Badge value="not_met" withIcon />
-                  </div>
-                  {g.reason && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{g.reason}</p>}
-                </li>
-              ))}
-            </ul>
+          <CardBody className="!py-2 divide-y divide-border -mx-6">
+            {whyGroups.map((group) => (
+              <div key={group.type} className="px-6 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold">{group.label}</span>
+                  <Badge value={group.type} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{group.consequence}</p>
+                <ul className="divide-y divide-border mt-2 -mx-6 border-t border-border">
+                  {group.items.map((g) => (
+                    <li key={g.requirement_id} className="px-6 py-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="font-medium leading-relaxed">{g.description}</span>
+                        {g.riskLevel && <Badge value={g.riskLevel} withIcon />}
+                      </div>
+                      {g.reason && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{g.reason}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </CardBody>
         </Card>
       )}
