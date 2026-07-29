@@ -47,3 +47,29 @@ surfaced it, what it is, why it wasn't just done anyway.
   plan itself), not a defect — noting it here in case the template reads
   poorly enough in practice to justify revisiting the prompt-based version
   later.
+
+## Phase 4
+
+- **Two sections built, not the three the design doc names.** §5 of
+  `TENDER_JOURNEY_DESIGN.md` and the implementation plan's default-section
+  table both name three landing targets (Requirements / AI Recommendation /
+  Business Decision). Business Decision was not built as a separate third
+  section: Phase 2 already integrated the Business Decision panel directly
+  into the AI Recommendation scroll (positioned right after the blockers),
+  so a literal third tab would either duplicate that content or need to
+  strip it back out of the AI Recommendation section — neither is a small
+  change, and neither was asked for by this phase. Implemented instead as
+  two sections (Requirements, AI Recommendation), with `completed` missions
+  defaulting to AI Recommendation the same as `awaiting_approval` --
+  Phase 2's reorder already puts the recorded/recordable decision near the
+  top of that section, so the practical effect (land somewhere that shows
+  the decision quickly) is preserved without a separate tab. Flagging this
+  as a documented interpretation, not a silent scope cut — worth revisiting
+  explicitly if Decision History (Phase 6) ends up wanting its own tab
+  alongside a literal Business Decision tab rather than folded into AI
+  Recommendation.
+- **Requirement type filter chip labels use raw enum text**
+  (`t.replace(/_/g, " ")`, e.g. "evaluation criteria") rather than a
+  human-friendly label map, identical to how `TenderDetail.tsx` already did
+  this before deletion. Carried over unchanged rather than improved, since
+  Phase 4's scope is the merge, not new copy polish.
