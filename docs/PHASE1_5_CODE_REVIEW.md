@@ -12,7 +12,7 @@ Read-only review — no code was changed to produce this document. Findings are 
 
 ---
 
-## 2. `POST /missions/{id}/execute` has no rate limit
+## 2. ~~`POST /missions/{id}/execute` has no rate limit~~ — DONE (`ffc7370`)
 
 **Problem:** Every other cost-incurring endpoint carries `@limiter.limit(...)` (`evaluation.py:75`, `tenders.py:39/73/113`, `capabilities.py:69`), but `execute_mission` (`backend/app/api/v1/missions.py:92-109`) — which triggers the full Decision Engine LLM run — does not.
 **Why it matters:** reopens the exact abuse vector RC-2 finding H-2 closed elsewhere; one unrated endpoint is enough to let a client hammer LLM spend even though every sibling endpoint is protected.
@@ -20,10 +20,11 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** Add `@limiter.limit("10/minute")` matching `evaluation.py`'s existing rate.
 **Implementation complexity:** Trivial.
 **Recommendation:** Fix immediately.
+**Resolution:** `@limiter.limit("10/minute")` added to `execute_mission`, matching `evaluation.py`. Verified via import + full backend test suite (15/15).
 
 ---
 
-## 3. No security response headers
+## 3. ~~No security response headers~~ — DONE (`281dd28`)
 
 **Problem:** CORS is well-configured (explicit allowlist, no wildcard — `backend/app/main.py:44-59`), but there's no `X-Content-Type-Options`, `X-Frame-Options`, or HSTS middleware anywhere.
 **Why it matters:** cheap, standard hardening for a platform that will hold real procurement documents and company financial data; the absence is a gap an actual security review before a first customer would flag immediately.
@@ -31,10 +32,11 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** A small Starlette middleware adding the standard headers, registered once in `main.py`.
 **Implementation complexity:** Small.
 **Recommendation:** Do this during Phase 1.5, before the first real customer.
+**Resolution:** `SecurityHeadersMiddleware` added in `backend/app/main.py` — `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY` always; `Strict-Transport-Security` outside `development` (inert over plain HTTP, so skipped locally). Verified via import + full backend test suite (15/15).
 
 ---
 
-## 4. Logging is thin and inconsistent outside the LLM path
+## 4. ~~Logging is thin and inconsistent outside the LLM path~~ — DONE (`d602827`, with finding 5)
 
 **Problem:** Only 7 of ~20 backend modules call `logger.` at all; none of the 10 API routers log before translating a caught `NotFoundError`/`ConflictError` into an HTTP response (e.g. `backend/app/api/v1/missions.py:104-109`, `backend/app/api/v1/approval.py:52-59`). `document_service.upload_document`'s rollback path (`backend/app/services/document_service.py:41-46`) also logs nothing, unlike the equivalent pattern in `tender_service.py:119-121` and `capability_service.py:95-98`.
 **Why it matters:** operators can currently only diagnose LLM-related failures from logs; the far more common 404/409/422 failures (auth, validation, conflicting state) leave no trace. This directly undercuts `logging_config.py`'s own stated bar ("an incident should be diagnosable").
@@ -42,10 +44,11 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** One log line per except-block at minimum; better, a shared exception-to-HTTP mapper registered once via `app.add_exception_handler(...)` in `main.py` that logs and maps in one place instead of ~30 duplicated try/except blocks (see finding 5).
 **Implementation complexity:** Medium.
 **Recommendation:** High priority — pairs naturally with finding 5 below (same code you'd touch either way).
+**Resolution:** Implemented together with finding 5 — see below. Also added a matching log line to `document_service.upload_document`'s rollback path.
 
 ---
 
-## 5. ~30 duplicated try/except blocks across routers
+## 5. ~~~30 duplicated try/except blocks across routers~~ — DONE (`d602827`)
 
 **Problem:** Every router repeats the identical `except NotFoundError → 404`, `except ConflictError → 409` pattern by hand (e.g. `missions.py:72-76,86-90,104-109`, `approval.py:51-59,71-79,88-93`).
 **Why it matters:** it's consistent today, which is good, but it's copy-pasted rather than centralized — a change to the mapping (or adding the logging from finding 4) currently requires editing every router by hand, and nothing guarantees a future router won't forget one.
@@ -53,6 +56,7 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** A FastAPI exception handler registered once (`app.add_exception_handler(NotFoundError, ...)` etc.) removes ~40 lines of repetition and centralizes the logging fix from finding 4 at the same time.
 **Implementation complexity:** Medium.
 **Recommendation:** Do together with finding 4.
+**Resolution:** New `backend/app/core/exception_handlers.py` registers one handler per exception type (`NotFoundError`->404, `ConflictError`->409, `ExtractionError`->422, `UnsupportedFileTypeError`->415, `FileTooLargeError`->413, `AuthenticationError`->401 — the exact mapping verified identical at all ~30 original call sites), each logging at WARNING before responding. Removed the now-redundant try/except blocks from all 9 routers (missions, approval, evaluation, tenders, documents, capabilities, auth, company, users); local handling that does real extra work (the `ValueError` case in `capabilities.update_capability`, the file-missing-on-disk case in `documents.download_document`) was left in place. Response shape unchanged (`{"detail": ...}`), so this was not a breaking API change. Verified via import, pyflakes (no unused imports/undefined names), full backend test suite (15/15), and a manual 401 smoke check.
 
 ---
 
@@ -89,7 +93,7 @@ Read-only review — no code was changed to produce this document. Findings are 
 
 ---
 
-## 9. `Dropzone` is keyboard-inaccessible
+## 9. ~~`Dropzone` is keyboard-inaccessible~~ — DONE (`f075615`)
 
 **Problem:** `frontend/src/components/kit/Dropzone.tsx:73-88` is a plain `<div onClick=...>` with no `role="button"`, `tabIndex`, or key handling.
 **Why it matters:** a keyboard-only user cannot reach or activate the upload target at all — a hard accessibility failure, not a nice-to-have, on the primary entry point of the product (tender/document upload).
@@ -97,10 +101,11 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** Add `role="button" tabIndex={0}` plus Enter/Space key handling.
 **Implementation complexity:** Trivial.
 **Recommendation:** Fix immediately — this is the cheapest high-impact item in the entire review.
+**Resolution:** Added `role="button"`, `tabIndex={0}`, `aria-label`, and Enter/Space key handling matching the WAI-ARIA button pattern. Verified via `tsc --noEmit` + `vite build`.
 
 ---
 
-## 10. No ESLint/Prettier config, despite lint-disable comments already in the code
+## 10. ~~No ESLint/Prettier config, despite lint-disable comments already in the code~~ — DONE (`0968379`, with finding 14)
 
 **Problem:** No `.eslintrc*`/`eslint.config.*` exists anywhere in `frontend/`, no `lint` script in `package.json`, and CI (`.github/workflows/ci.yml`) runs typecheck + build only — yet the codebase already scatters `// eslint-disable-next-line react-hooks/exhaustive-deps` comments (`TenderDetail.tsx:51`, `Missions.tsx:130`, `Dashboard.tsx:91`, `Capabilities.tsx:101`, `Evaluation.tsx:104`).
 **Why it matters:** those disable comments are currently no-ops — nothing lints the project, so nothing is actually being suppressed, and nothing catches a real hook-rule violation before merge.
@@ -108,6 +113,7 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** ESLint + `eslint-plugin-react-hooks` + Prettier, a `lint` script, and a CI step alongside the existing typecheck/build jobs.
 **Implementation complexity:** Small-medium.
 **Recommendation:** Do early in Phase 1.5 — cheap, and every day without it is another day of undetectable drift.
+**Resolution:** ESLint 9 flat config (`frontend/eslint.config.js`) — `@eslint/js` recommended + `typescript-eslint` recommended + `eslint-plugin-react-hooks` (deliberately pinned to v5, not the latest v7 — v7 bundles new React Compiler rules like `set-state-in-effect` that flag several existing, intentional `useEffect(() => { refresh() }, [])` initial-fetch patterns as errors; adopting those was judged an unauthorized behavioral refactor, out of scope for a production-readiness pass) + `eslint-plugin-react-refresh`, with `eslint-config-prettier` last. `npm run lint` added plus a Lint step in CI ahead of typecheck/build. Prettier installed and configured (`.prettierrc.json`, matching the codebase's existing double-quote/semicolon style) but **no repo-wide reformat was run** — `prettier --check` flags 33 pre-existing files, and mechanical formatting changes were kept deliberately separate from this functional pass; available as its own explicitly-scoped task if wanted. Verified: `eslint .` -> 0 errors, 4 pre-existing `react-refresh/only-export-components` warnings (context/hook files exporting non-component values — real but low-priority, not touched); `tsc -b` clean; `vite build` succeeds.
 
 ---
 
@@ -133,7 +139,7 @@ Read-only review — no code was changed to produce this document. Findings are 
 
 ---
 
-## 13. Minor accessibility gaps: `SearchInput` clear button, `Menu` keyboard nav
+## 13. ~~Minor accessibility gaps: `SearchInput` clear button, `Menu` keyboard nav~~ — DONE (`8aad83a`)
 
 **Problem:** `SearchInput.tsx:22-27`'s "×" clear button has no `aria-label`; `Menu.tsx` closes on outside-click but not `Escape`, and `MenuItem` has no arrow-key traversal.
 **Why it matters:** both are used across every list page (Missions, Documents, Evaluation) — small individually, additive across the whole app for screen-reader and keyboard-only users.
@@ -141,10 +147,11 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** `aria-label="Clear search"` (trivial); `Escape`-to-close + roving-tabindex on `Menu`/`MenuItem` (small).
 **Implementation complexity:** Trivial + small.
 **Recommendation:** Bundle with finding 9 as one "accessibility pass" batch.
+**Resolution:** `SearchInput`: `aria-label="Clear search"` plus `type="button"` on the clear button. `Menu`/`MenuItem`: `Escape` now closes the panel and returns focus to the trigger; `ArrowUp`/`ArrowDown`/`Home`/`End` move focus between items (wrapping at the ends); first item auto-focused on open; added `role="menu"`/`role="menuitem"`. (Arrow-key traversal implemented via focus management rather than strict roving `tabindex`, to avoid changing the panel's native tab order — a lower-risk approach for the same user-facing outcome.) Verified: eslint clean, `tsc -b` clean, `vite build` succeeds.
 
 ---
 
-## 14. `tsconfig.json` disables unused-code checks under an otherwise-strict config
+## 14. ~~`tsconfig.json` disables unused-code checks under an otherwise-strict config~~ — DONE (`0968379`, with finding 10)
 
 **Problem:** `frontend/tsconfig.json:12-13` sets `noUnusedLocals: false, noUnusedParameters: false` while `strict: true` is on everywhere else.
 **Why it matters:** inconsistent strictness posture — dead variables/imports can accumulate silently with nothing catching them at compile time.
@@ -152,10 +159,11 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** Flip both to `true`; expect a small one-time cleanup of whatever's already accumulated.
 **Implementation complexity:** Small.
 **Recommendation:** Do alongside finding 10 (ESLint setup) — same "turn the strictness dial up" pass.
+**Resolution:** Both flipped to `true`. One dead import surfaced (`CardHeader` in `Missions.tsx`), removed. `@typescript-eslint/no-unused-vars` turned off in the new ESLint config in favor of this tsconfig check, to avoid two differently-configured checks for the same thing. Verified: `tsc -b` clean.
 
 ---
 
-## 15. No deployment/containerization story documented anywhere
+## 15. ~~No deployment/containerization story documented anywhere~~ — DONE (`e6d8985`)
 
 **Problem:** no `Dockerfile`/`docker-compose.yml` anywhere in the repo, and no deployment doc describing how `backend`/`frontend` actually get run in production. Relatedly, `rate_limit.py`'s in-memory (`slowapi`) limiter is honestly documented in its own module docstring as per-process/single-instance, but that constraint isn't surfaced anywhere a future deployer would see it before scaling horizontally.
 **Why it matters:** "deployment reliability" was explicitly named in this review's scope; right now, reproducing this deployment (or scaling it) depends entirely on institutional memory rather than a written procedure.
@@ -163,10 +171,11 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** A minimal `docs/DEPLOYMENT.md` (even a paragraph: how it's run today, and "do not horizontally scale without swapping the rate limiter to a shared store first") is more valuable right now than a Dockerfile — write the doc before building infrastructure nobody's asked for yet (Technical Debt Policy, "Customer driven" category).
 **Implementation complexity:** Trivial (doc) to medium (actual containerization, deferred).
 **Recommendation:** Write the one-page doc now; defer Docker until an actual deployment target exists.
+**Resolution:** `docs/DEPLOYMENT.md` written — how BidOps runs today (local processes, no containerization), the `/health` endpoint, and the rate-limiter single-instance constraint surfaced explicitly ("do not run multiple backend instances... without first moving the limiter to a shared store"). No Dockerfile/infra added — explicitly deferred per Technical Debt Policy until a real deployment target exists (see the upcoming GCP deployment planning session).
 
 ---
 
-## 16. Documentation sprawl: 26 files in `docs/` with no index
+## 16. ~~Documentation sprawl: 26 files in `docs/` with no index~~ — DONE (`f2c28e1`)
 
 **Problem:** `docs/` now holds 26 markdown files — the original numbered spec (`00_Project_Context.md` through `11_Risk_Assessment.md`), the frozen architecture docs, feature design docs, and audit reports — with no single index explaining which is authoritative for what, or which of the numbered `0X_*.md` docs are still current vs. superseded by `CORE_ARCHITECTURE.md`.
 **Why it matters:** exactly the "documentation quality" dimension this review was asked to check — a new contributor (or a future Claude session without this conversation's context) has no fast way to know that `CORE_ARCHITECTURE.md`/`AI_ARCHITECTURE_PRINCIPLES.md`/`ENGINEERING_DIRECTIVE.md` are the frozen governing set and the numbered docs are historical.
@@ -174,6 +183,7 @@ Read-only review — no code was changed to produce this document. Findings are 
 **Proposed solution:** A short `docs/README.md` (or a table at the top of the root `README.md`) mapping each doc to its status: frozen/governing, historical/superseded, feature-specific, or audit-report.
 **Implementation complexity:** Trivial.
 **Recommendation:** Do this soon — it's the cheapest fix in this entire document relative to how much confusion it prevents.
+**Resolution:** `docs/INDEX.md` written, mapping all 24 `docs/` files (plus `backend/99_DECISIONS_LOG.md` and `BACKLOG.md`) to frozen/governing, historical/superseded, feature-specific, or audit-report status.
 
 ---
 
@@ -181,20 +191,22 @@ Read-only review — no code was changed to produce this document. Findings are 
 
 Highest priority, do first (all trivial-to-small, several are pure risk-elimination):
 
-1. Verify the OpenAI model string (#1) — blocking check, not a task.
-2. Rate limit `execute_mission` (#2).
-3. Fix `Dropzone` keyboard accessibility (#9).
-4. Write the one-page deployment doc (#15).
-5. Write the `docs/` index (#16).
+1. ✅ Verify the OpenAI model string (#1) — blocking check, not a task. Resolved, no code change needed.
+2. ✅ Rate limit `execute_mission` (#2) — `ffc7370`.
+3. ✅ Fix `Dropzone` keyboard accessibility (#9) — `f075615`.
+4. ✅ Write the one-page deployment doc (#15) — `e6d8985`.
+5. ✅ Write the `docs/` index (#16) — `f2c28e1`.
 
 Second wave (small-medium, real but not urgent):
 
-6. Security response headers (#3).
-7. Router logging + centralized exception handling (#4 + #5, same pass).
-8. ESLint/Prettier + `noUnusedLocals` (#10 + #14, same pass).
-9. Accessibility batch: `SearchInput`, `Menu` (#13).
+6. ✅ Security response headers (#3) — `281dd28`.
+7. ✅ Router logging + centralized exception handling (#4 + #5, same pass) — `d602827`.
+8. ✅ ESLint/Prettier + `noUnusedLocals` (#10 + #14, same pass) — `0968379`.
+9. ✅ Accessibility batch: `SearchInput`, `Menu` (#13) — `8aad83a`.
 
-Third wave (medium, worth doing but no urgency):
+**Immediate and Second Wave: complete.** Approved by founder 2026-07-29 ("Proceed with the Immediate and Second Wave items"); all nine items implemented with a regression check (backend pytest, frontend `tsc -b` + `eslint` + `vite build`) after each, per the founder's explicit guardrails. Phase 1.5 is cleanly closed at this checkpoint — Third Wave and the deferred item below were **not** started, per explicit instruction not to proceed automatically.
+
+Third wave (medium, worth doing but no urgency) — **not started**:
 
 10. `ConfirmDialog` component (#7).
 11. Shared active-missions hook (#8).
@@ -206,3 +218,9 @@ Deferred, revisit only if it becomes a real problem:
 14. `Evaluation.tsx` split (#12) — wait for the next real change to that file.
 
 No item in this document proposes a new AI feature, a new table, a new endpoint, or a change to `CORE_ARCHITECTURE.md`. Everything here is implementation-level, consistent with the Phase 1.5 directive.
+
+---
+
+## Next: Deployment Readiness Planning
+
+Per founder direction (2026-07-29), the next planning session shifts from Phase 1.5's implementation-level backlog to deployment engineering: GCP deployment, production database integration, authentication (Google OAuth), RBAC/IAM verification, secrets and environment configuration, and end-to-end production validation. Third Wave items above remain available to resume later but are not part of that next session's scope unless explicitly pulled back in.
