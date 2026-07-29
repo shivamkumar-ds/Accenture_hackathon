@@ -1,10 +1,13 @@
-# Tender Assessment — Information Architecture Redesign (Proposal)
+# Tender Assessment — Information Architecture Redesign (Frozen)
 
-Status: **Proposed — awaiting review.** Grows directly out of
+Status: **Frozen — design complete, implementation not started.** Reached
+through the same discussion-first discipline as `TENDER_JOURNEY_DESIGN.md`
+(Discussion → Review → Approval → Freeze, `ENGINEERING_DIRECTIVE.md`
+§"Post-Architecture Phase"). Grows directly out of
 `docs/TENDER_JOURNEY_DESIGN.md` (frozen) and
 `docs/TENDER_JOURNEY_IMPLEMENTATION_PLAN.md` (implemented, all 7 phases
-complete). This document proposes superseding *only* §3 of the design doc
-— the mission page's information hierarchy — after using the finished
+complete). This document supersedes *only* §3 of the design doc — the
+mission page's information hierarchy — after using the finished
 implementation end to end and concluding the hierarchy itself, not any
 individual section's content, was the wrong shape. Nothing else in the
 frozen design doc is reopened: the vocabulary rule (§1), the three-way
@@ -13,8 +16,8 @@ facts (§4), and everything marked explicitly deferred (§7) all stand.
 
 No code, no component structure, no visual or styling change is proposed
 here. This is information architecture only, per the discussion that
-produced it — CSS, React, and card layout are all explicitly out of scope
-until this is reviewed and approved.
+produced it — CSS, React, and card layout remain explicitly out of scope
+until a dedicated implementation plan is written and approved (see §9).
 
 ## 1. The Problem, Restated Precisely
 
@@ -57,19 +60,26 @@ document is judged against them:
   `ComplianceMatrixEntryRead` actually contain — nothing here requires a
   new metric the AI would have to invent.
 - Requirements remains the AI's input, Decision History remains the
-  human's outcome, and Tender Assessment (this document's proposed name —
-  see §3) is the AI's reasoning in between. All three stay conceptually
-  and structurally separate pages/sections, exactly as Phases 4 and 6
-  built them. This document only redesigns the middle one.
+  human's outcome, and Tender Assessment (this document's confirmed name —
+  see §3, §8) is the AI's reasoning in between. All three stay
+  conceptually and structurally separate pages/sections, exactly as
+  Phases 4 and 6 built them. This document only redesigns the middle one.
 
-One principle added by this discussion, not present in the original
-design doc, promoted here to a first-class rule for anything built from
-this point forward:
+Two principles added by this discussion, not present in the original
+design doc, promoted here to first-class rules for anything built from
+this point forward — not just this page:
 
 - **Every major section must answer exactly one business question.** If a
   section can't be summarized as the answer to one question a procurement
   director would actually ask, it doesn't earn independent existence — it
   either merges into a section that does, or becomes evidence behind one.
+- **No duplicate summaries.** Every section must either introduce new
+  information or move the decision forward. A section that only restates
+  what a previous section already established — the same conclusion from
+  a different angle, not new material — should be merged or removed. This
+  is the rule that produced most of the mergers in §4: the Assessment and
+  Why tiers are required to tell one continuous story, not two
+  independently-written summaries that happen to agree.
 
 ## 3. Direct Answers to the Questions This Discussion Raised
 
@@ -209,8 +219,11 @@ one — no fabricated severity where the data doesn't have it. This ranking
 is a distinct signal from Administrative/Structural below and must not be
 collapsed into one label per blocker: severity (how bad) and fixability
 (how changeable) are different questions, and a blocker can be any
-combination of the two — severe-but-fixable and minor-but-structural are
-both real, meaningful states that a single blended label would erase.
+combination of the two, and the combinations mean genuinely different
+things — "Critical, Administrative" reads as *urgent but fixable*;
+"Critical, Structural" reads as *urgent and not realistically solvable*.
+Those are opposite messages. A single blended label would erase exactly
+the distinction that makes this ranking useful.
 
 **What Would It Take** (renamed in review from "Can This Change" — the
 original name was AI-centric; this is the executive's actual question)
@@ -237,10 +250,26 @@ tiers exist to earn.
 **Evidence** is the only tier that's a genuine behavior change, not just a
 regroup: today the Compliance Summary tiles, the Compliance Matrix, and
 the confidence breakdown are all visible by default, just positioned
-lower. Here they're closed by default, one disclosure, opened on request
-— this is where the Reviewer/Compliance Officer persona (already defined
-in `TENDER_JOURNEY_DESIGN.md` §5) actually lives, not where a first-time
-reader is expected to land.
+lower. Resolved in review: this becomes **one** disclosure, not several —
+"Evidence" as a single collapsed entry point, opened on request, with the
+confidence breakdown, the Compliance Matrix (each row already carrying
+its own verification metadata — `verified_by_name`, `verified_at` — that
+detail is not duplicated elsewhere), and the evidence trails all living
+inside it. The unifying test is the "no duplicate summaries" principle
+from §2: every one of these answers the same underlying question — "why
+should I trust this assessment?" — so they're one answer with internal
+structure, not four separately-collapsible concepts competing for the
+reader's decision about which one to open. This is where the Reviewer/
+Compliance Officer persona (already defined in `TENDER_JOURNEY_DESIGN.md`
+§5) actually lives, not where a first-time reader is expected to land.
+
+**Not the same thing as Decision History.** Evidence's Compliance Matrix
+rows carry per-row verification detail (who verified this specific row,
+when) — that's row-level provenance, not the mission-level Business
+Decision audit trail Phase 6 already built as its own separate section.
+The two must not merge: Evidence answers "why should I trust this
+assessment," Decision History answers "what actually happened on this
+mission, and when" — different questions, per §2's own rule.
 
 **Explicitly untouched:** Requirements and Decision History remain
 separate sections outside this five-tier structure, exactly as Phases 4
@@ -363,26 +392,37 @@ to hit:
 - Assessment block gains a fourth line: a grounded, `recommendation_type`-
   aware business-consequence sentence, synthesized from the #1-ranked
   blocker rather than written independently (§4, §5).
-
-**Still open:**
-- Sign off on the Administrative/Structural mapping (§5) as a fixed,
-  reviewable classification — the one piece of genuinely new interpretive
-  content in this document, deserves explicit scrutiny before
-  implementation, not approval by omission.
-- Confirm the Evidence tier should be a single unified disclosure (matrix
-  + confidence + compliance summary together) rather than three
-  independently-collapsible pieces.
+- **Administrative/Structural mapping — approved as a deterministic
+  presentation-layer classification.** Same category of decision as the
+  existing `RECOMMENDATION_LABELS` / `Badge` tone mappings already in the
+  codebase — a fixed, human-authored mapping over a backend enum, not
+  per-tender AI output. Conditions attached, binding on implementation:
+  the mapping lives in one file, is documented inline (why each
+  `RequirementType` value maps where it does), and is deterministic — the
+  same `RequirementType` always produces the same classification, never
+  computed per-tender.
+- **Evidence — single unified disclosure, confirmed and specified.** One
+  collapsed "Evidence" entry point, not three independently-collapsible
+  pieces. Contains confidence breakdown, Compliance Matrix (with its
+  existing per-row verification metadata), and evidence trails — all
+  three answer the same underlying question ("why should I trust this
+  assessment") and are one answer with internal structure, not three
+  separate decisions the reader has to make about what to open. Full
+  detail and the explicit non-merge with Decision History in §4.
 
 **Related, not in scope of this document:** renaming Reports (e.g.
 "Tender Library") — raised in review, agreed in direction, but scoped to
 a different page than this document covers. Logged in
-`docs/TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md` instead of folded in here.
+`docs/TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md` instead of folded in here,
+including the further observation that "Tender Workspace" and "Tender
+Library" would read as a coherent pair in navigation in a way "Tender
+Workspace" and "Reports" currently don't.
 
 ## 9. Next Steps (Not Started)
 
-If approved, this document freezes the same way `TENDER_JOURNEY_DESIGN.md`
-did, and a new implementation plan gets written against it — phased,
-reviewed, and approved the same way the seven Tender Journey phases were,
-starting from the current frozen implementation rather than from scratch.
-No implementation plan exists yet. No code has been written against this
-document.
+This document is frozen; no further design iteration is planned for it.
+A new implementation plan needs to be written against it when
+implementation resumes — phased, reviewed, and approved the same way the
+seven Tender Journey phases were, starting from the current frozen
+implementation rather than from scratch. No implementation plan exists
+yet. No code has been written against this document.

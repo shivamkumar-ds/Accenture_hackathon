@@ -87,4 +87,9 @@ surfaced it, what it is, why it wasn't just done anyway.
   exact wrong implication an earlier fix removed. Not implemented here:
   out of scope for the Tender Assessment redesign document, which covers
   the mission page only, not `Reports.tsx`. Revisit if/when Reports itself
-  gets its own design pass.
+  gets its own design pass. Added on final review: "Tender Workspace" and
+  "Tender Library" would read as a coherent navigation pair in a way
+  "Tender Workspace" and "Reports" currently don't — "Reports" sounds like
+  a PDF export feature, "Tender Library" sounds like institutional memory,
+  which is closer to what the page actually became after Phase 5. Worth
+  weighing alongside the rename itself when Reports gets its own pass.
