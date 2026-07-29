@@ -44,6 +44,14 @@ class DecisionEventRead(BaseModel):
     event: str
     result: str | None
     timestamp: datetime
+    # Additive (TENDER_JOURNEY_IMPLEMENTATION_PLAN.md Phase 6) -- resolved
+    # read-time only from user_id, same pattern already used for
+    # ComplianceMatrixEntryRead.verified_by_name. Not populated by
+    # model_validate() directly (AuditLog has no such column); the router
+    # attaches it via model_copy(update=...) after a batch User lookup.
+    # Defaults to None so this stays backward-compatible with any other
+    # caller that constructs a DecisionEventRead without it.
+    user_name: str | None = None
 
 
 class ApprovalHistoryResponse(BaseModel):

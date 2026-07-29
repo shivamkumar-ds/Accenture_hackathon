@@ -305,6 +305,10 @@ export interface DecisionEventRead {
   event: string;
   result: string | null;
   timestamp: string;
+  // Additive (TENDER_JOURNEY_IMPLEMENTATION_PLAN.md Phase 6) -- resolved
+  // server-side from user_id, same pattern as
+  // ComplianceMatrixEntryRead.verified_by_name.
+  user_name: string | null;
 }
 
 export interface ApprovalHistoryResponse {

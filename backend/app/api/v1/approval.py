@@ -79,9 +79,22 @@ def get_approval_history(
         db, mission_id, current_user.company_id
     )
 
+    # Decision History (TENDER_JOURNEY_IMPLEMENTATION_PLAN.md Phase 6) --
+    # DecisionEventRead.user_id is a raw UUID; resolve it to a display name
+    # the same way verify_compliance_row() above already resolves
+    # verified_by_name -- one small batch query, read-time only, tolerant
+    # of a user whose account no longer resolves (skipped, not raised).
+    user_ids = {e.user_id for e in decision_events if e.user_id is not None}
+    user_names: dict[uuid.UUID, str] = {}
+    if user_ids:
+        user_names = {u.id: u.name for u in db.query(User).filter(User.id.in_(user_ids)).all()}
+
     return ApprovalHistoryResponse(
         mission=MissionRead.model_validate(mission),
         recommendation=RecommendationRead.model_validate(recommendation),
         compliance_matrix=[ComplianceMatrixEntryRead.model_validate(r) for r in compliance_rows],
-        decision_events=[DecisionEventRead.model_validate(e) for e in decision_events],
+        decision_events=[
+            DecisionEventRead.model_validate(e).model_copy(update={"user_name": user_names.get(e.user_id)})
+            for e in decision_events
+        ],
     )

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
+  getApprovalHistory,
   getCompany,
   getEvaluation,
   getMission,
@@ -20,6 +21,7 @@ import { forwardLookingGap } from "../lib/forwardLookingGap";
 import type {
   BusinessDecision,
   ComplianceMatrixEntryRead,
+  DecisionEventRead,
   EvaluationResponse,
   MatchStatus,
   MissionRead,
@@ -50,6 +52,7 @@ import {
   ChevronDown,
   Download,
   FileSearch,
+  History,
   Lightbulb,
   RefreshCw,
   ShieldCheck,
@@ -100,12 +103,13 @@ function statusCount(matrix: ComplianceMatrixEntryRead[], status: MatchStatus) {
 
 type MergedEntry = MergedComplianceEntry;
 
-// Requirements / AI Recommendation -- collapses the former TenderDetail.tsx
-// + Evaluation.tsx route split into sections of one page
-// (docs/TENDER_JOURNEY_DESIGN.md §5, TENDER_JOURNEY_IMPLEMENTATION_PLAN.md
-// Phase 4). Decision History is a third section named in the design doc,
-// deferred to Phase 6 (needs an additive backend field first).
-type MissionSection = "requirements" | "recommendation";
+// Requirements / AI Recommendation / Decision History -- collapses the
+// former TenderDetail.tsx + Evaluation.tsx route split into sections of one
+// page (docs/TENDER_JOURNEY_DESIGN.md §5, TENDER_JOURNEY_IMPLEMENTATION_PLAN.md
+// Phases 4 and 6). Business Decision itself is not a fourth section here --
+// see docs/TENDER_JOURNEY_DEFERRED_ENHANCEMENTS.md's Phase 4 entry for why
+// (already integrated into the AI Recommendation scroll by Phase 2).
+type MissionSection = "requirements" | "recommendation" | "history";
 
 export default function Evaluation() {
   const { missionId } = useParams<{ missionId: string }>();
@@ -133,6 +137,10 @@ export default function Evaluation() {
   // moved here.
   const [companyName, setCompanyName] = useState("");
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  // Decision History (Phase 6) -- getApprovalHistory() also returns
+  // mission/recommendation/compliance_matrix, but this page already has
+  // all of that from its own fetches; only decision_events is new data.
+  const [decisionEvents, setDecisionEvents] = useState<DecisionEventRead[]>([]);
 
   useEffect(() => {
     if (!user?.company_id) return;
@@ -177,6 +185,18 @@ export default function Evaluation() {
         setData(await getEvaluation(missionId));
       } catch {
         setData(null);
+      }
+
+      // Decision History data -- same "legitimately absent" reasoning as
+      // the evaluation fetch above: get_approval_history() 404s until a
+      // recommendation exists (approval_service.get_approval_history()),
+      // which is exactly the condition the evaluation fetch above already
+      // handles. Independent try/catch rather than nesting inside that one
+      // so a failure here never masks a successful evaluation fetch.
+      try {
+        setDecisionEvents((await getApprovalHistory(missionId)).decision_events);
+      } catch {
+        setDecisionEvents([]);
       }
     } catch {
       setMissionNotFound(true);
@@ -383,14 +403,13 @@ export default function Evaluation() {
         )}
       </div>
 
-      {/* Requirements / AI Recommendation section switcher -- collapses the
-          former TenderDetail.tsx + Evaluation.tsx route split into one page
-          (docs/TENDER_JOURNEY_DESIGN.md §5; TenderDetail deleted this
-          phase). Reusing FilterChip as the switcher rather than introducing
-          a new tab component -- no equivalent exists in the kit yet and
-          this phase's scope is the page merge, not a new UI primitive.
-          Decision History is a third section named in the design doc,
-          deferred to Phase 6. */}
+      {/* Requirements / AI Recommendation / Decision History section
+          switcher -- collapses the former TenderDetail.tsx +
+          Evaluation.tsx route split into one page (docs/
+          TENDER_JOURNEY_DESIGN.md §5; TenderDetail deleted in Phase 4).
+          Reusing FilterChip as the switcher rather than introducing a new
+          tab component -- no equivalent exists in the kit yet and this
+          phase's scope is a page merge, not a new UI primitive. */}
       <div className="flex gap-2">
         <FilterChip label="Requirements" active={section === "requirements"} onClick={() => setSection("requirements")} />
         <FilterChip
@@ -398,6 +417,7 @@ export default function Evaluation() {
           active={section === "recommendation"}
           onClick={() => setSection("recommendation")}
         />
+        <FilterChip label="Decision History" active={section === "history"} onClick={() => setSection("history")} />
       </div>
 
       {section === "requirements" && (
@@ -797,6 +817,54 @@ export default function Evaluation() {
             );
           })()
         ))}
+
+      {/* Decision History -- read-only audit trail, backed by the
+          previously-unused GET /approval/{mission_id} (Phase 6). Renders
+          every recorded event chronologically (compliance verifications and
+          the final Business Decision alike -- both are logged through the
+          same Human Approval Layer, approval_service.py's _log()), each
+          attributed to a real user name where resolvable. */}
+      {section === "history" && (
+        <Card>
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                <History size={15} className="text-muted-foreground" />
+                Decision History
+              </span>
+            }
+            description={
+              decisionEvents.length
+                ? `${decisionEvents.length} event${decisionEvents.length === 1 ? "" : "s"}`
+                : undefined
+            }
+          />
+          <CardBody>
+            {decisionEvents.length === 0 ? (
+              <EmptyState
+                icon={History}
+                title="No decision history yet"
+                description="Compliance verifications and the recorded Business Decision will appear here once this mission has a recommendation."
+              />
+            ) : (
+              <ul className="divide-y divide-border -mx-6">
+                {decisionEvents.map((e, i) => (
+                  <li key={`${e.timestamp}-${i}`} className="px-6 py-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium leading-relaxed">{e.event}</p>
+                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                        {new Date(e.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{e.user_name ?? "Unknown user"}</p>
+                    {e.result && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{e.result}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }
