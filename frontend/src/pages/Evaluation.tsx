@@ -18,6 +18,8 @@ import { recommendationLabel } from "../lib/recommendationLabels";
 import { mergeRequirementContext, type MergedComplianceEntry } from "../lib/complianceMerge";
 import { tenderDisplayName } from "../lib/tenderName";
 import { forwardLookingGap } from "../lib/forwardLookingGap";
+import { rankBlockers } from "../lib/blockerPriority";
+import { assessmentClaim, assessmentConsequence } from "../lib/assessmentCopy";
 import type {
   BusinessDecision,
   ComplianceMatrixEntryRead,
@@ -312,6 +314,17 @@ export default function Evaluation() {
     [data]
   );
 
+  // docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md Phase 1/2 -- severity-
+  // ranked view of blockingIssues (Why's "Top Priorities" ordering, and the
+  // Assessment tier's #1-ranked blocker for its consequence sentence). Kept
+  // as its own memo rather than folded into blockingIssues above so the
+  // "what counts as a blocker" logic and "how they're ordered" logic stay
+  // independently readable.
+  const rankedBlockers = useMemo(
+    () => rankBlockers(blockingIssues, data?.compliance_matrix ?? []),
+    [blockingIssues, data]
+  );
+
   // UI-only readiness indicator, mirroring (not duplicating) the backend's
   // approval_service.get_blocking_rows() rule -- the backend remains the
   // sole enforcement (a 409 on Save is still possible, e.g. a race with
@@ -597,28 +610,42 @@ export default function Evaluation() {
                 : "bg-warning";
             return (
               <div className="space-y-6">
-                {/* AI Recommendation -- the visual centerpiece of the page. Kept
-          deliberately calm per the brand brief (flat surface, no gradient
-          wash, no oversized warning colors): a single thin accent stripe
-          carries the GO/NO-GO signal, everything else stays neutral and
-          typographic so it reads as an executive decision report, not a
-          status dashboard.
+                {/* The Assessment -- docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md
+          Phase 2, docs/TENDER_ASSESSMENT_REDESIGN.md §4. Merges the former
+          hero, "Can we bid?", and "Should we bid?" blocks into one: opens
+          with a spoken claim (not a labeled data point), holds the
+          eligibility gate (hard fact) and the risk judgment (soft fact) as
+          two distinct sentences inside the same block -- preserving the
+          blockingIssues vs. risk_level distinction as content, not as two
+          separate full-width sections -- and closes with a single grounded
+          consequence sentence synthesized from the #1-ranked blocker
+          (blockerPriority.ts), so this tier and Why tell one continuous
+          story instead of two independently-written summaries (redesign
+          doc §2's "no duplicate summaries" principle -- also why the
+          former "Key Reasons" paragraph, which repeated executive_summary
+          a second time, isn't carried forward here).
 
-          Labeled "AI Recommendation," never "AI Decision" -- Tender
-          Journey design philosophy (docs/TENDER_JOURNEY_DESIGN.md §1):
-          "Decision" is reserved exclusively for the human action recorded
-          below in BusinessDecisionPanel. The AI advises; it never decides,
-          and the label must never imply otherwise. */}
+          Kept deliberately calm per the brand brief (flat surface, no
+          gradient wash, no oversized warning colors): a single thin accent
+          stripe carries the GO/NO-GO signal, everything else stays neutral
+          and typographic so it reads as an executive decision report, not
+          a status dashboard.
+
+          Never "AI Decision" -- vocabulary rule unchanged
+          (docs/TENDER_JOURNEY_DESIGN.md §1). "Decision" is reserved
+          exclusively for the human action recorded below in
+          BusinessDecisionPanel. The AI advises; it never decides. */}
       <div className="relative rounded-xl border bg-surface p-6 sm:p-8 shadow-hero overflow-hidden">
         <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", accentBar)} />
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AI Recommendation</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">The Assessment</span>
         <div className="flex flex-col md:flex-row items-start md:items-center gap-8 mt-3">
           <div className="flex-1 space-y-3 min-w-0 order-2 md:order-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-display font-semibold text-4xl tracking-tight">{recommendationLabel(recommendation.recommendation_type)}</span>
-              {recommendation.risk_level && <Badge value={recommendation.risk_level} withIcon />}
-            </div>
-            <p className="text-sm leading-relaxed text-foreground/80 max-w-2xl">{recommendation.executive_summary}</p>
+            <p className="font-display font-semibold text-3xl md:text-4xl tracking-tight leading-tight">
+              {assessmentClaim(recommendation.recommendation_type)}
+            </p>
+            {recommendation.executive_summary && (
+              <p className="text-sm leading-relaxed text-foreground/80 max-w-2xl">{recommendation.executive_summary}</p>
+            )}
           </div>
           <div className="order-1 md:order-2 flex flex-col items-center gap-1.5 shrink-0">
             <ConfidenceRing value={recommendation.overall_confidence} size={104} />
@@ -626,11 +653,51 @@ export default function Evaluation() {
           </div>
         </div>
 
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-8 mb-3">Key Reasons</p>
-        <p className="text-sm leading-relaxed text-foreground/80 max-w-3xl">
-          {recommendation.executive_summary ?? "No executive summary was generated for this evaluation."}
-        </p>
+        <div className="grid sm:grid-cols-2 gap-5 mt-8 pt-6 border-t border-border">
+          <div className="flex items-start gap-3">
+            {blockingIssues.length > 0 ? (
+              <AlertOctagon size={20} className="text-danger shrink-0 mt-0.5" />
+            ) : (
+              <ShieldCheck size={20} className="text-success shrink-0 mt-0.5" />
+            )}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Can we bid?</p>
+              <p className="text-sm font-semibold tracking-tight">
+                {blockingIssues.length > 0
+                  ? `No — ${blockingIssues.length} mandatory requirement${blockingIssues.length === 1 ? "" : "s"} not met`
+                  : "Yes — every mandatory requirement is met"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <ShieldQuestion size={20} className="text-muted-foreground shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Should we bid?</p>
+              {recommendation.risk_level ? (
+                <p className="text-sm text-foreground/80 leading-relaxed">
+                  Overall risk assessed as{" "}
+                  <span className="font-medium text-foreground">{recommendation.risk_level}</span>, based on{" "}
+                  {blockingIssues.length > 0
+                    ? `${blockingIssues.length} unresolved mandatory requirement(s).`
+                    : "no unresolved mandatory requirements."}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">No risk level was returned for this evaluation.</p>
+              )}
+            </div>
+          </div>
+        </div>
 
+        {assessmentConsequence(recommendation.recommendation_type, rankedBlockers[0]) && (
+          <p className="text-sm leading-relaxed text-foreground/90 mt-6 pt-6 border-t border-border">
+            {assessmentConsequence(recommendation.recommendation_type, rankedBlockers[0])}
+          </p>
+        )}
+
+        {/* Confidence breakdown -- stays here for now; moves under the
+            Evidence disclosure in Phase 6
+            (docs/TENDER_ASSESSMENT_IMPLEMENTATION_PLAN.md), not deleted and
+            re-added across two phases. */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8 pt-6 border-t border-border">
           <ConfidenceBar label="Document Confidence" value={recommendation.document_confidence} />
           <ConfidenceBar label="Entity Confidence" value={recommendation.entity_confidence} />
@@ -638,62 +705,6 @@ export default function Evaluation() {
           <ConfidenceBar label="Recommendation Confidence" value={recommendation.recommendation_confidence} />
         </div>
       </div>
-
-      {/* Can we bid? -- hard eligibility gates, visually dominant, first
-          question in the Tender Journey's decision sequence
-          (docs/TENDER_JOURNEY_DESIGN.md §3). A one-glance binary answer,
-          not the itemized list -- the specific reasons stay in "What's
-          Blocking This Bid" further down, unchanged. */}
-      <div
-        className={cn(
-          "rounded-xl border p-5 flex items-center gap-4",
-          blockingIssues.length > 0 ? "border-danger/40 bg-danger-soft" : "border-success/40 bg-success-soft"
-        )}
-      >
-        {blockingIssues.length > 0 ? (
-          <AlertOctagon size={26} className="text-danger shrink-0" />
-        ) : (
-          <ShieldCheck size={26} className="text-success shrink-0" />
-        )}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Can we bid?</p>
-          <p className="text-lg font-semibold tracking-tight">
-            {blockingIssues.length > 0
-              ? `No — ${blockingIssues.length} mandatory requirement${blockingIssues.length === 1 ? "" : "s"} not met`
-              : "Yes — every mandatory requirement is met"}
-          </p>
-        </div>
-      </div>
-
-      {/* Should we bid? -- strategic/risk framing, the second question in
-          the sequence, distinct from the binary eligibility gate above.
-          (Previously titled "Risk Summary" -- relabeled per
-          docs/TENDER_JOURNEY_DESIGN.md §3; content unchanged.) */}
-      <Card>
-        <CardHeader
-          title={
-            <span className="flex items-center gap-2">
-              <ShieldQuestion size={15} className="text-muted-foreground" />
-              Should we bid?
-            </span>
-          }
-        />
-        <CardBody className="flex items-center gap-4">
-          {recommendation.risk_level ? (
-            <>
-              <Badge value={recommendation.risk_level} withIcon />
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Overall risk assessed as <span className="font-medium text-foreground">{recommendation.risk_level}</span> based on{" "}
-                {blockingIssues.length > 0
-                  ? `${blockingIssues.length} unresolved mandatory requirement(s).`
-                  : "no unresolved mandatory requirements."}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">No risk level was returned for this evaluation.</p>
-          )}
-        </CardBody>
-      </Card>
 
       {/* What's actually blocking this bid -- the itemized detail behind
           "Can we bid?" above. Unchanged from before this reorder. */}
