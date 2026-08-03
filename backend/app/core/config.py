@@ -162,6 +162,23 @@ class Settings(BaseSettings):
     # single test run are never throttled by accident.
     rate_limit_enabled: bool = True
 
+    # Migration safety system (docs/BUG_BUCKET.md Bug #001). On startup,
+    # the app compares the database's current Alembic revision against
+    # the code's migration head -- see app/core/migration_guard.py.
+    # migration_guard_enabled is a full kill switch (e.g. for a one-off
+    # script that intentionally runs before migrating). Everywhere else,
+    # leave it on. migration_guard_fail_on_mismatch controls what
+    # happens on a detected mismatch: True (the default, everywhere,
+    # including production) aborts startup outright per the engineering
+    # rule that a schema mismatch is a fatal startup error, not a
+    # runtime one. An operator can set this False in production only if
+    # they've deliberately decided a logged warning is preferable to
+    # startup downtime for their deployment process -- the check still
+    # runs and still logs loudly either way, this only changes whether
+    # it's allowed to block startup.
+    migration_guard_enabled: bool = True
+    migration_guard_fail_on_mismatch: bool = True
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @model_validator(mode="after")

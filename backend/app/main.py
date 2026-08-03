@@ -3,6 +3,7 @@ BidOps AI — Application entrypoint.
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,7 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging
+from app.core.migration_guard import MigrationOutOfDateError, check_migrations_current
 from app.core.rate_limit import limiter
 
 # Configured before anything else runs, so every logger created below
@@ -27,11 +29,33 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 logger.info("Starting %s (environment=%s)", settings.app_name, settings.app_env)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Migration safety system (docs/BUG_BUCKET.md Bug #001) -- runs before
+    # the app accepts a single request. On a mismatch this either raises
+    # (aborting startup outright, uvicorn exits non-zero) or logs and
+    # continues, per migration_guard_fail_on_mismatch -- see config.py for
+    # why the default is "fail" in every environment, including production.
+    if settings.migration_guard_enabled:
+        try:
+            check_migrations_current(settings)
+        except MigrationOutOfDateError:
+            if settings.migration_guard_fail_on_mismatch:
+                raise
+            logger.warning(
+                "Continuing startup despite the schema mismatch above "
+                "(migration_guard_fail_on_mismatch=False)."
+            )
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     description="Enterprise Bid Decision Intelligence Platform",
     debug=settings.debug,
+    lifespan=lifespan,
 )
 
 

@@ -31,6 +31,31 @@ uvicorn app.main:app --reload
 
 Requires a running PostgreSQL instance matching `DATABASE_URL` in `.env`.
 
+## Database Migrations
+
+Whenever you pull backend code that includes a new migration (anything new under
+`alembic/versions/`), run this **before** starting the server:
+
+```
+cd backend
+source venv/bin/activate
+alembic upgrade head
+```
+
+This is not optional housekeeping. If the database schema falls behind the code — a
+migration exists but hasn't been applied — every query touching the changed table fails
+with a raw `UndefinedColumn` error, and it looks like a random runtime bug rather than what
+it actually is. See `docs/BUG_BUCKET.md` Bug #001 for exactly this happening.
+
+To make this impossible to miss, the app checks its own schema at every startup
+(`app/core/migration_guard.py`): it compares the database's current Alembic revision
+against the code's migration head and, on a mismatch, aborts startup with a clear message
+instead of letting the process boot and fail later on the first request that touches the
+changed table. This is generic — it reads both revisions through Alembic's own APIs, so it
+requires no maintenance as new migrations are added. Controlled by two settings
+(`MIGRATION_GUARD_ENABLED`, `MIGRATION_GUARD_FAIL_ON_MISMATCH`, both default `true`) — see
+`app/core/config.py` for what each one does.
+
 ## Configuration
 
 All configuration lives in `app/core/config.py` (`Settings`) — nothing reads environment

@@ -24,6 +24,7 @@ Approval), not a routine edit.
 | `KNOWN_LIMITATIONS.md` | What BidOps deliberately doesn't do yet, and why — check before treating a gap as a bug. |
 | `DEPLOYMENT.md` | How BidOps runs today and the rate-limiter constraint to resolve before scaling horizontally. |
 | `PRODUCTION_FINDINGS.md` | Live validation backlog/log for real-tender dogfooding — the evidence source Principle 9 requires before any new architecture discussion. |
+| `BUG_BUCKET.md` | Permanent, append-only log of production-affecting/development-blocking bugs — what happened, root cause, fix, and the prevention mechanism now in place. |
 | `../BACKLOG.md` | Carried-forward unresolved items. |
 | `../backend/99_DECISIONS_LOG.md` | Full chronological engineering decisions log (D-101 onward). |
 
