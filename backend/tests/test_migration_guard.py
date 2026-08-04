@@ -67,3 +67,17 @@ def test_diverged_migration_history_raises_clear_error():
             get_code_head_revision()
 
     assert "diverged" in str(excinfo.value) or "Multiple heads" in str(excinfo.value)
+
+
+def test_no_migrations_in_codebase_raises():
+    """A checkout with zero migration files (get_current_head() returns
+    None, distinct from the multi-head case above) is a different kind
+    of broken state -- not this project's actual condition today, but
+    the code explicitly handles it, so it should be proven correct
+    rather than left as an unverified branch."""
+    with patch("app.core.migration_guard.ScriptDirectory") as mock_script_dir:
+        mock_script_dir.from_config.return_value.get_current_head.return_value = None
+        with pytest.raises(MigrationOutOfDateError) as excinfo:
+            get_code_head_revision()
+
+    assert "No Alembic migrations found" in str(excinfo.value)

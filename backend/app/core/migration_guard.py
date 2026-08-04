@@ -48,6 +48,21 @@ class MigrationOutOfDateError(RuntimeError):
 
 
 def _alembic_config() -> AlembicConfig:
+    """A minimal AlembicConfig for reading migration script metadata only
+    -- this never connects to a database (unlike alembic/env.py's own
+    Config, used when running the `alembic` CLI), so it never touches
+    sqlalchemy.url.
+
+    script_location is overridden with an absolute path rather than
+    trusting alembic.ini's own `script_location = alembic` as-is:
+    Alembic resolves a relative script_location against the process's
+    current working directory, not the .ini file's directory. The CLI
+    happens to always be run from backend/, so that relative path works
+    there, but this module runs as part of the app importing normally
+    (e.g. under uvicorn), where the working directory isn't guaranteed
+    to be backend/. Passing an absolute path removes that assumption
+    entirely.
+    """
     config = AlembicConfig(str(ALEMBIC_INI_PATH))
     config.set_main_option("script_location", str(ALEMBIC_SCRIPT_LOCATION))
     return config
