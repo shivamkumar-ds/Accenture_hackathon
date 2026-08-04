@@ -35,6 +35,8 @@ catches the bug's own failure mode, not just that the immediate symptom went awa
 
 **Title:** Database schema out of sync after Alembic migration
 
+**Status:** Closed — 4 August 2026
+
 **Date:** 4 August 2026
 
 **Severity:** High
@@ -111,3 +113,13 @@ should discover the problem the instant they start the server — not after navi
 through the application into the one screen whose query happens to touch the changed
 table. This is now a permanent, generic safety system, not a one-off fix for the `category`
 column specifically.
+
+### Closure
+
+Closed 4 August 2026 after a founder final review confirmed the subsystem covers: stale
+schemas, unmigrated databases, diverged migration histories, and a codebase with zero
+migration files — each with a clear, developer-facing message and a passing regression
+test (`backend/tests/test_migration_guard.py`, 5 tests). No revision ID is hardcoded
+anywhere in the implementation. This subsystem is now considered permanent infrastructure;
+per the Bug Lifecycle above, it does not require further architectural work unless a real
+production issue is found.
