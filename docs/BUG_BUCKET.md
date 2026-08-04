@@ -114,6 +114,79 @@ through the application into the one screen whose query happens to touch the cha
 table. This is now a permanent, generic safety system, not a one-off fix for the `category`
 column specifically.
 
+### Investigation Addendum: "Failed Tender Delete" (ruled out as a second bug)
+
+**Original user observation.** While diagnosing what turned out to be this bug, the founder
+separately reported: uploaded a tender PDF; extraction did not complete successfully and the
+tender showed a Failed-type status instead of Success/Completed; clicked Delete on that
+tender; immediately afterward, Tender Workspace stopped displaying tenders — for other
+accounts too, not just the one that triggered it. This was flagged as a possible second,
+distinct bug and explicitly re-opened for investigation rather than being assumed away.
+
+**Why "delete a failed tender" was initially suspected.** The reported sequence — upload,
+failure, delete, then breakage — plausibly pointed at the delete path mishandling a tender
+whose upload/analysis never reached a clean terminal state (e.g. a null/dangling document
+reference, an unhandled exception in the delete or subsequent list query). That's a
+reasonable, distinct failure mode from a migration mismatch, so it was treated as an open
+question rather than folded into Bug #001 by assumption.
+
+**Exact reproduction scenario.** Built with real service-layer code (`mission_service`)
+against an in-memory SQLite database, no assumptions substituted for execution:
+1. Create a Company, User, Document, Mission, and Tender exactly as `tender_service.upload_tender()`
+   would leave them (`Tender.processing_status = "pending"`, a real, already-persisted
+   Document row — a Tender is never created without one, by construction).
+2. Force `tender_analyzer.analyze_tender()` to raise, simulating a genuinely unparseable PDF,
+   and drive it through `mission_service.execute_mission()` exactly as the app does.
+3. Delete (archive) the resulting mission via `mission_service.archive_mission()`.
+4. List missions again via `mission_service.list_missions()` plus the same
+   tender/document-attachment logic `GET /api/v1/missions` uses.
+5. Repeat steps 1–4 for a second, unrelated company with a healthy tender present in the same
+   database at the same time, to directly test the "other accounts too" part of the report.
+
+**What was actually verified, not assumed.**
+- The failure is already handled correctly: `ExtractionError` propagates cleanly (no bare/
+  unhandled exception), `Tender.processing_status` becomes `"failed"`, `Mission.status`
+  reverts to `"created"` (there is no `FAILED` value in the frozen `MissionStatus` enum, by
+  design — reverting keeps the mission retryable), and zero `Requirement` rows are created
+  (no orphaned data from the partial run).
+- Deleting (archiving) that mission raises no exception and leaves the Document row
+  completely untouched — archiving a Mission never touches Document rows at all.
+- Listing missions immediately afterward raises no exception and returns the correct,
+  now-archived row with the right tender name resolved.
+- Running the same sequence for Company A while Company B has an untouched, healthy tender
+  in the same database: Company B's list is completely unaffected — same row count, same
+  status, same tender.
+
+**Why cross-company isolation rules out a failed-tender corruption bug.** The reported
+symptom was every account losing Tender Workspace simultaneously, not just the account that
+owned the failed tender. `mission_service.archive_mission()` and `mission_service.list_missions()`
+are both filtered by `company_id` at the query level — there is no code path in this workflow
+by which one company's tender, in any state, can affect a query scoped to a different
+`company_id`. If corrupted delete handling for one failed tender were the cause, only that
+one company's Tender Workspace would have broken; the "other accounts too" detail is
+therefore evidence *against* this being the cause, not evidence for it.
+
+**Why the global schema mismatch fully explains the observed behavior.** A missing database
+column, by contrast, breaks every query against that table for every row, regardless of
+which company owns it — because the query never gets far enough to filter by `company_id` at
+all; it fails at the SQL level first. That is the only failure mode in this codebase capable
+of taking down Tender Workspace for every account at once, and it is exactly what
+`UndefinedColumn: tenders.category` was already proven to do (see Symptoms/Root Cause
+above). The timing the founder described ("at roughly the same time there was also a
+database migration issue") and the specific "affects everyone" signature both match Bug
+#001 precisely, and neither matches a single-tender delete bug.
+
+**Conclusion: no second bug found.** Bug #001 alone fully explains the reported behavior.
+This was demonstrated by reproduction, not assumed — see the four passing tests below.
+
+**Regression tests.** `backend/tests/test_failed_tender_delete.py` (4 tests) now permanently
+covers this exact workflow: `test_failed_analysis_sets_expected_status_with_no_orphans`,
+`test_deleting_a_failed_tender_does_not_raise`,
+`test_listing_missions_after_deleting_a_failed_tender_does_not_raise`, and
+`test_deleting_a_failed_tender_never_affects_another_company` (the direct test of the
+cross-company claim above). If a future change ever does make this path unsafe, these tests
+fail immediately instead of the conclusion silently going stale.
+
 ### Closure
 
 Closed 4 August 2026 after a founder final review confirmed the subsystem covers: stale
