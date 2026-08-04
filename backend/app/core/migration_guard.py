@@ -28,9 +28,9 @@ from pathlib import Path
 from alembic.config import Config as AlembicConfig
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import create_engine
+from alembic.util.exc import CommandError
 
-from app.core.config import Settings
+from app.core.database import engine
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,9 @@ ALEMBIC_SCRIPT_LOCATION = BACKEND_ROOT / "alembic"
 
 class MigrationOutOfDateError(RuntimeError):
     """The database's Alembic revision doesn't match the code's migration
-    head. Raised at startup, not discovered later via a runtime query
-    failure -- see module docstring."""
+    head (or the migration history itself is ambiguous -- see
+    get_code_head_revision). Raised at startup, not discovered later via
+    a runtime query failure -- see module docstring."""
 
 
 def _alembic_config() -> AlembicConfig:
@@ -52,34 +53,61 @@ def _alembic_config() -> AlembicConfig:
     return config
 
 
-def get_code_head_revision() -> str | None:
+def get_code_head_revision() -> str:
     """The latest migration revision the checked-out code defines.
 
-    None only if the alembic/versions directory has no migrations at
-    all yet (not the current state of this project, but handled
-    correctly rather than assumed away).
+    Raises MigrationOutOfDateError (rather than a raw alembic
+    CommandError) if the migration history has more than one head --
+    e.g. two branches each added a migration without a merge revision
+    reconciling them. That's a broken/ambiguous migration history, not
+    a normal "just run upgrade head" situation, but it should still
+    fail startup with the same clear, developer-facing message format
+    as every other case this module handles, not a bare stack trace
+    from a different exception type.
     """
     script = ScriptDirectory.from_config(_alembic_config())
-    return script.get_current_head()
+    try:
+        head = script.get_current_head()
+    except CommandError as exc:
+        raise MigrationOutOfDateError(
+            f"Could not determine a single migration head: {exc}\n"
+            "This usually means the migration history has diverged "
+            "(multiple heads). Run `alembic heads` in backend/ to see "
+            "them, then `alembic merge` to reconcile before starting "
+            "the server."
+        ) from exc
+    if head is None:
+        raise MigrationOutOfDateError(
+            "No Alembic migrations found under alembic/versions/ -- "
+            "this project should always have at least one."
+        )
+    return head
 
 
-def get_database_revision(database_url: str) -> str | None:
+def get_database_revision() -> str | None:
     """The revision the database is actually stamped at.
+
+    Reuses the app's single shared engine (app.core.database.engine)
+    rather than opening a second, throwaway connection pool just for
+    this check -- one engine per process, same as everywhere else in
+    the codebase.
 
     None means either a brand-new, unmigrated database, or one that
     predates Alembic being introduced to this project -- both are
-    legitimately "out of date" and should surface the same message.
+    legitimately "out of date" and surface the same message.
+
+    A connection failure (e.g. Postgres isn't running at all) is
+    deliberately left uncaught here: that's a different, more basic
+    problem than a schema mismatch, and the resulting exception
+    already explains itself clearly without this module dressing it
+    up as something it isn't.
     """
-    engine = create_engine(database_url)
-    try:
-        with engine.connect() as connection:
-            context = MigrationContext.configure(connection)
-            return context.get_current_revision()
-    finally:
-        engine.dispose()
+    with engine.connect() as connection:
+        context = MigrationContext.configure(connection)
+        return context.get_current_revision()
 
 
-def format_out_of_date_message(current_revision: str | None, head_revision: str | None) -> str:
+def format_out_of_date_message(current_revision: str | None, head_revision: str) -> str:
     """The exact developer-facing message shown on a mismatch -- large,
     unambiguous, and carrying the one command that fixes it."""
     border = "=" * 70
@@ -88,7 +116,7 @@ def format_out_of_date_message(current_revision: str | None, head_revision: str 
         "DATABASE SCHEMA OUT OF DATE\n"
         f"{border}\n\n"
         f"Database Revision:\n  {current_revision or '(no migrations applied yet)'}\n\n"
-        f"Latest Revision:\n  {head_revision or '(no migrations exist)'}\n\n"
+        f"Latest Revision:\n  {head_revision}\n\n"
         "Run:\n\n"
         "  cd backend\n"
         "  alembic upgrade head\n\n"
@@ -97,19 +125,20 @@ def format_out_of_date_message(current_revision: str | None, head_revision: str 
     )
 
 
-def check_migrations_current(settings: Settings) -> None:
+def check_migrations_current() -> None:
     """
     Compare the database's current Alembic revision against the code's
     migration head.
 
-    Raises MigrationOutOfDateError on a mismatch. Callers decide what
-    "fatal" means for their environment (see main.py's lifespan
+    Raises MigrationOutOfDateError on a mismatch (or an ambiguous
+    migration history -- see get_code_head_revision). Callers decide
+    what "fatal" means for their environment (see main.py's lifespan
     handler and Settings.migration_guard_fail_on_mismatch) -- this
     function's only job is detection and a clear message, not deciding
     whether to take the process down.
     """
     head_revision = get_code_head_revision()
-    current_revision = get_database_revision(settings.database_url)
+    current_revision = get_database_revision()
 
     if current_revision == head_revision:
         logger.info("Database schema is up to date (revision=%s).", current_revision)

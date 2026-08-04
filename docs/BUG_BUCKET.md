@@ -5,6 +5,30 @@ in BidOps, in order — what happened, why, how it was fixed, and what now preve
 class of bug from recurring. This is not a task tracker; entries are never deleted, only
 appended.
 
+## Bug Lifecycle
+
+Every bug logged here follows the same seven steps, without exception (see
+`docs/ENGINEERING_DIRECTIVE.md`'s "Bug handling policy" — this is a project-wide
+engineering rule, not just a documentation convention):
+
+```
+1. Bug discovered
+2. Root cause identified
+3. Permanent fix implemented
+4. Regression prevention mechanism added
+5. BUG_BUCKET.md updated
+6. Documentation updated (if applicable)
+7. Regression tested
+```
+
+**Engineering Principle:** Never fix only the symptom. Whenever practical, every bug should
+leave the codebase stronger than before by preventing the same class of issue from
+happening again.
+
+An entry below is not "done" until steps 4 and 7 are visible in it — a prevention mechanism
+that exists in the codebase, and a test (or equivalent verification) that proves it actually
+catches the bug's own failure mode, not just that the immediate symptom went away.
+
 ---
 
 ## Bug #001
@@ -50,13 +74,18 @@ alembic upgrade head
 Permanent (see Prevention below):
 
 - Implemented automatic migration revision verification at FastAPI startup
-  (`app/core/migration_guard.py`).
+  (`app/core/migration_guard.py`), reusing the application's single shared database engine
+  (`app/core/database.py`) rather than opening a second connection pool just for this check.
 - Clear, large, developer-facing error message showing both revisions and the exact fix
-  command.
+  command; a diverged/multi-head migration history is also caught and surfaced with the
+  same clear message type, instead of a bare Alembic error.
 - Startup blocked (fatal `MigrationOutOfDateError`) when the schema is outdated, by default
   in every environment.
 - `backend/README.md` updated with a "Database Migrations" section documenting the
   requirement and the guard.
+- `backend/tests/test_migration_guard.py` — automated regression suite (step 7 of the Bug
+  Lifecycle above): a stale database, an unmigrated database, and a diverged migration
+  history must all raise; a matching database must not.
 
 ### Prevention
 

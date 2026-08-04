@@ -74,6 +74,26 @@ customer's real requirement to define it correctly). Do not add infrastructure b
 might be useful someday — add it when production deployment, customer demand, or operational
 necessity actually requires it.
 
+## Bug handling policy
+
+Established after Bug #001 (`docs/BUG_BUCKET.md` — a database migration silently drifting
+out of sync with the code, discovered only via a runtime 500). Every bug found in this
+codebase follows the same lifecycle, without exception:
+
+1. Bug discovered
+2. Root cause identified
+3. Permanent fix implemented
+4. Regression prevention mechanism added
+5. `BUG_BUCKET.md` updated
+6. Documentation updated (if applicable)
+7. Regression tested
+
+**Never fix only the symptom.** Whenever practical, every bug should leave the codebase
+stronger than before by preventing the same class of issue from happening again — not just
+the one instance that was found. A patch that makes today's failure go away without step 4
+(a mechanism that would catch the next occurrence automatically) is incomplete work, not a
+finished fix.
+
 ## Execution model
 
 No large migrations. Development proceeds milestone by milestone; each milestone must leave

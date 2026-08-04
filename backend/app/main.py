@@ -39,7 +39,7 @@ async def lifespan(_app: FastAPI):
     # why the default is "fail" in every environment, including production.
     if settings.migration_guard_enabled:
         try:
-            check_migrations_current(settings)
+            check_migrations_current()
         except MigrationOutOfDateError:
             if settings.migration_guard_fail_on_mismatch:
                 raise
