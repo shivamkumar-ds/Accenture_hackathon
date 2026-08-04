@@ -15,6 +15,7 @@ triggers re-execution regardless of what rows already exist.
 
 import uuid
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog, Mission, Tender
@@ -52,6 +53,38 @@ def archive_mission(db: Session, mission_id: uuid.UUID, company_id: uuid.UUID) -
     return mission
 
 
+def _try_transition_to_running(db: Session, mission: Mission, expected_status: MissionStatus) -> bool:
+    """
+    Bug #003 (docs/BUG_BUCKET.md): atomically flips a mission to RUNNING
+    only if its status is still exactly what this request just read.
+
+    execute_mission() used to do this as a plain read-then-write
+    (`if mission.status == RUNNING: raise ...` followed by a separate
+    `mission.status = RUNNING; db.commit()`), which is a classic
+    check-then-act race: two concurrent execute requests for the same
+    mission (a double-click, two open tabs, a retried request) can both
+    read the pre-RUNNING status before either commits, both pass the
+    check, and both proceed to run analysis/evaluation concurrently
+    against the same mission — duplicate LLM calls, duplicate
+    Requirement/Recommendation rows, and whichever commit lands last
+    silently overwriting the other's state.
+
+    This single `UPDATE ... WHERE id = :id AND status = :expected`
+    is the atomic compare-and-swap: the database itself guarantees only
+    one concurrent transaction's WHERE clause can still match by the
+    time it runs, so only one caller ever gets a rowcount of 1. The
+    loser gets rowcount 0 and must treat that as "already running/
+    changed," matching the existing ConflictError contract.
+    """
+    result = db.execute(
+        update(Mission)
+        .where(Mission.id == mission.id, Mission.status == expected_status)
+        .values(status=MissionStatus.RUNNING)
+    )
+    db.commit()
+    return result.rowcount == 1
+
+
 async def execute_mission(
     db: Session,
     mission_id: uuid.UUID,
@@ -73,8 +106,16 @@ async def execute_mission(
         raise ConflictError(f"Mission '{mission_id}' is already running.")
 
     original_status = mission.status
-    mission.status = MissionStatus.RUNNING
-    db.commit()
+    # Atomic compare-and-swap (Bug #003) — closes the race window between
+    # the status checks above and this transition: if a concurrent
+    # request already moved this mission out of `original_status`
+    # (e.g. into RUNNING) between our read and this write, this returns
+    # False instead of silently letting both requests proceed.
+    if not _try_transition_to_running(db, mission, original_status):
+        raise ConflictError(
+            f"Mission '{mission_id}' was changed by another request just now — please retry."
+        )
+    db.refresh(mission)
     _log(db, mission.id, triggered_by, ORCHESTRATOR_AGENT, "Mission execution started")
 
     tender = db.query(Tender).filter(Tender.mission_id == mission.id).one_or_none()

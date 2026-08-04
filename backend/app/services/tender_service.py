@@ -113,14 +113,28 @@ async def run_analysis(
     tender.processing_status = DocumentProcessingStatus.PROCESSING.value
     db.commit()
 
-    document = db.get(Document, tender.uploaded_document)
-    file_path = storage.resolve_path(document.storage_path)
-
+    # Bug #002: this whole block used to sit outside the try/except below,
+    # so a missing Document row or an unresolvable storage path raised a
+    # bare AttributeError straight out of the service — an unclean 500,
+    # and (worse) the tender was left stuck in PROCESSING forever, since
+    # nothing ever set it to FAILED. Not reachable through the normal
+    # upload flow today (a Tender's Document is never hard-deleted while
+    # still referenced), but a raw crash here would leave no clean
+    # recovery path if that invariant were ever violated, so it's folded
+    # into the same failure handling as an analyzer error.
     try:
+        document = db.get(Document, tender.uploaded_document)
+        if document is None:
+            raise ExtractionError(
+                f"Tender '{tender_id}' references a document that no longer exists."
+            )
+        file_path = storage.resolve_path(document.storage_path)
         results = await tender_analyzer.analyze_tender(file_path, provider=provider)
     except Exception as exc:
         tender.processing_status = DocumentProcessingStatus.FAILED.value
         db.commit()
+        if isinstance(exc, ExtractionError):
+            raise
         raise ExtractionError(f"Tender analysis failed for tender '{tender_id}': {exc}") from exc
 
     requirement_rows = []
