@@ -337,3 +337,109 @@ sessions against the same mission (simulating two concurrent requests), has one 
 transition commit first, then proves the second session's transition — attempted with the
 status it observed *before* the first session's commit — correctly fails instead of
 silently succeeding a second time.
+
+---
+
+## Bug #004
+
+**Title:** `record_decision()` could write a misleading "Decision recorded" audit entry
+before the mission's status change was actually committed
+
+**Status:** Closed — 4 August 2026
+
+**Date:** 4 August 2026
+
+**Severity:** Medium (data-integrity/audit-trail correctness — found during the Phase 1
+Backend Stabilization Audit's Compliance/Approval review, not reported by a user; directly
+relevant because the product's core value proposition is an auditable, explainable
+decision trail)
+
+**Category:** Backend / Transaction ordering
+
+### Symptoms (would-be, if triggered)
+
+None observed in production. Found by review: `approval_service.record_decision()` called
+`_log(...)` — which writes an `AuditLog` row and commits it immediately — *before* applying
+and committing the mission's own status change (`mission.status = COMPLETED`, `completed_at
+= now()`). If that second, later commit had ever failed (a dropped connection, a transient
+`OperationalError`), the AuditLog would already show "Decision recorded: PROCEED" while the
+mission itself silently remained `AWAITING_APPROVAL` — a permanent, false record of a
+business decision that never actually took effect.
+
+### Root Cause
+
+Two independent commits inside one logical operation, in the wrong order: the "fact" (audit
+log entry) was persisted before the "truth" (the actual state change) was confirmed
+persisted. `approval_service.verify_compliance_row()`, right above this function in the same
+file, already gets this ordering right — it commits the real row mutation first and only
+logs afterward — so this was an inconsistency with the file's own established, safer
+pattern, not a novel design question.
+
+### Fix
+
+`backend/app/services/approval_service.py::record_decision()` — reordered so the mission's
+own `db.commit()` happens first; `_log(...)` (and its own commit) now only runs once that
+has already succeeded.
+
+### Prevention
+
+Matches the ordering already used by `verify_compliance_row()` in the same module — any
+future function following that established pattern (commit the real change, then log it)
+is safe by construction; a reviewer comparing new code against the existing functions in
+this file will see the correct order modeled twice now, not once.
+
+### Engineering Rule
+
+**An audit-trail write must never commit before the fact it's recording has itself been
+durably committed.** Where a single logical operation involves both a state change and a
+log entry describing it, the state change's commit must happen first — a log entry is a
+claim about something that already happened, never a claim about something about to happen.
+
+### Regression tests
+
+`backend/tests/test_approval_decision_audit_ordering.py` —
+`test_failed_mission_commit_leaves_no_misleading_audit_entry`: forces the mission-state
+commit to fail and asserts no `AuditLog` row was written and the mission's status is
+unchanged — proving the audit trail can no longer claim a decision that didn't happen.
+
+---
+
+## Phase 1 Backend Stabilization Audit — Areas Reviewed, No Bug Found
+
+Documented per the audit's explicit "state it, don't invent work" instruction. Each area
+below was read in full and checked against: CRUD correctness, exception handling,
+transaction boundaries, rollback behaviour, validation, ownership/company-scoping,
+soft-delete conventions, null handling, duplicate handling, and (where applicable) race
+conditions.
+
+- **`document_service.py`** — upload/list/get/delete. Transaction boundaries correct
+  (upload rolls back and unlinks the on-disk file together on failure); delete is
+  soft-delete only and correctly blocked by `ConflictError` while any active Tender or
+  capability entity still references the document. No changes made.
+- **`capability_service.py`** — build/list/find/update/soft-remove. Duplicate-build
+  guard (`document_has_active_capabilities`) checked before extraction starts, not after;
+  the one `db.commit()` mid-function (setting `PROCESSING`) is intentionally followed by
+  its own dedicated try/except around the extraction call, same shape as the tender
+  analysis fix above, and was already correct here. No changes made.
+- **`auth_service.py` / `company_service.py` / `user_service.py`** — registration is
+  atomic (Company + first Administrator, one transaction, `IntegrityError` mapped to a
+  clean `ConflictError` either way); login returns an identical error message for "no such
+  user" and "wrong password" (no account-enumeration leak); rate limiting is in place on
+  both `/auth/register` and `/auth/login`. No changes made.
+- **`decision_service.py::run_evaluation()`** — every DB write (`CapabilitySnapshot`,
+  `Recommendation`, `CapabilityMapping`, `ComplianceMatrix`, the final `Mission` update)
+  happens via `db.flush()` (to obtain FK-able IDs) with a single `db.commit()` at the very
+  end; an exception anywhere in the reasoning or write sequence leaves nothing committed,
+  and `app/core/database.py::get_db()`'s `finally: db.close()` implicitly rolls back
+  whatever was never committed — so a mid-function failure can never leave a partial
+  evaluation persisted. Also specifically checked: `matched_entity_id` is only ever set
+  from an LLM-returned index that's bounds-checked against the real candidate list
+  (`app/agents/decision_engine.py`), so the later `next(e for t, e in candidates if e.id ==
+  result.matched_entity_id)` lookup in `decision_service.py` can never raise
+  `StopIteration` from a hallucinated ID — genuinely unreachable, not just unlikely. No
+  changes made.
+- **Reports / PDF export** — this backend has no PDF/report-generation module or endpoint.
+  The standalone `Reports.tsx` frontend page and its route were already retired earlier in
+  this project (frontend is feature-frozen); reporting is served entirely through the
+  existing `/evaluation` and `/approval` JSON APIs the Decision/Evidence screens already
+  consume. Nothing to audit here — confirmed absent, not skipped.

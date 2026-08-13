@@ -133,8 +133,6 @@ def record_decision(
             f"before a decision can be finalized: {row_ids}."
         )
 
-    _log(db, mission.id, user_id, f"Decision recorded: {decision.value}", reason or "")
-
     if decision in TERMINAL_DECISIONS:
         mission.status = MissionStatus.COMPLETED
         mission.completed_at = datetime.now(timezone.utc)
@@ -142,6 +140,18 @@ def record_decision(
 
     db.commit()
     db.refresh(mission)
+
+    # Bug #004: logged AFTER the mission's own commit succeeds, not before.
+    # This used to write "Decision recorded" to AuditLog (its own commit,
+    # inside _log()) *before* the mission.status mutation was ever
+    # committed. If that second commit had then failed for any reason, the
+    # audit trail would have permanently and misleadingly claimed a
+    # business decision was recorded when the mission's actual status
+    # never changed — a false record, which is exactly the failure mode a
+    # compliance/audit trail feature cannot tolerate. Matches the ordering
+    # verify_compliance_row() above already uses: commit the real state
+    # change first, log it only once that's actually true.
+    _log(db, mission.id, user_id, f"Decision recorded: {decision.value}", reason or "")
     return mission
 
 
