@@ -7,6 +7,7 @@ import type {
   CompanyRead,
   DocumentRead,
   EvaluationResponse,
+  GoogleLoginRequest,
   LoginRequest,
   MissionRead,
   RegisterRequest,
@@ -27,6 +28,13 @@ export const login = (payload: LoginRequest) =>
   apiClient.post<TokenResponse>("/api/v1/auth/login", payload).then((r) => r.data);
 
 export const getProfile = () => apiClient.get<UserRead>("/api/v1/auth/profile").then((r) => r.data);
+
+// Login/link only -- fails cleanly (extractErrorMessage-surfaced) if no
+// BidOps account exists yet for the Google account's email. Never creates
+// a Company; see backend/app/services/auth_service.py::login_with_google
+// for the full reasoning.
+export const googleLogin = (payload: GoogleLoginRequest) =>
+  apiClient.post<TokenResponse>("/api/v1/auth/google", payload).then((r) => r.data);
 
 // --- company ---
 

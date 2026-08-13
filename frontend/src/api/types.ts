@@ -56,6 +56,15 @@ export interface LoginRequest {
   password: string;
 }
 
+// POST /api/v1/auth/google -- id_token is the credential Google Identity
+// Services hands back to the frontend after the user picks an account;
+// verified server-side (signature, expiry, audience), never trusted as-is.
+// Login/link only: fails with a clean error if no BidOps account exists
+// for the Google account's email -- this never creates a Company.
+export interface GoogleLoginRequest {
+  id_token: string;
+}
+
 export interface CompanyRead {
   id: string;
   name: string;

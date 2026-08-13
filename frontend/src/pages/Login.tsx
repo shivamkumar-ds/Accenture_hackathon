@@ -1,11 +1,34 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { login as loginRequest, registerCompany } from "../api/endpoints";
+import { googleLogin, login as loginRequest, registerCompany } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { Button, Input, Logo } from "../components/kit";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, Users } from "lucide-react";
+
+// Set by whoever creates the OAuth Client ID in Google Cloud Console
+// (APIs & Services -> Credentials) -- unset in every environment until
+// then, which is exactly when the graceful fallback below applies. Not a
+// secret: this ID is meant to be public, embedded in frontend code.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
+// Minimal shape of the bits of Google Identity Services this page actually
+// calls -- avoids pulling in a full @types/google.accounts dependency for
+// three method calls.
+interface GoogleIdentityServices {
+  accounts: {
+    id: {
+      initialize: (config: { client_id: string; callback: (response: { credential: string }) => void }) => void;
+      renderButton: (parent: HTMLElement, options: { theme: string; size: string; width: number; text: string }) => void;
+    };
+  };
+}
+declare global {
+  interface Window {
+    google?: GoogleIdentityServices;
+  }
+}
 
 const FORGOT_PASSWORD_MAILTO =
   "mailto:bidops.ai@gmail.com?subject=" + encodeURIComponent("Password reset request — BidOps");
@@ -76,6 +99,74 @@ export default function Login() {
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+
+  // Google Sign-In: only wired up when GOOGLE_CLIENT_ID is actually
+  // configured (see the module-level comment above). Until then, the
+  // button below keeps its existing "coming soon" behavior unchanged --
+  // this never breaks local development or a deploy that hasn't set up
+  // Google Cloud Console credentials yet.
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  const handleGoogleCredential = async (response: { credential: string }) => {
+    setLoading(true);
+    try {
+      const res = await googleLogin({ id_token: response.credential });
+      login(res.access_token, res.user);
+      navigate("/");
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || mode !== "login") return;
+
+    let cancelled = false;
+
+    const render = () => {
+      if (cancelled || !window.google || !googleButtonRef.current) return;
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (response) => void handleGoogleCredential(response),
+      });
+      googleButtonRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        width: 400,
+        text: "signin_with",
+      });
+    };
+
+    if (window.google) {
+      render();
+      return;
+    }
+
+    // Loaded once and reused on later mounts -- Google's own script is
+    // idempotent about being included twice, but this avoids the network
+    // request and a flash of the fallback button on every mode toggle.
+    const existing = document.getElementById("google-identity-services");
+    if (existing) {
+      existing.addEventListener("load", render, { once: true });
+      return () => existing.removeEventListener("load", render);
+    }
+
+    const script = document.createElement("script");
+    script.id = "google-identity-services";
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = render;
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleGoogleCredential is stable enough for this effect's purpose; re-running it isn't the intent of remounting the button.
+  }, [mode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,16 +319,25 @@ export default function Login() {
                     <div className="h-px flex-1 bg-border" />
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    className="w-full"
-                    onClick={() => notify("info", "Google sign-in is coming soon.")}
-                    icon={<GoogleIcon />}
-                  >
-                    Sign in with Google
-                  </Button>
+                  {GOOGLE_CLIENT_ID ? (
+                    // Google's own rendered button -- required by their
+                    // terms for the One Tap/GIS flow (a custom button
+                    // triggering the same flow isn't a supported
+                    // integration). Centered via flex since it sizes
+                    // itself rather than filling the container.
+                    <div className="flex justify-center" ref={googleButtonRef} />
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="w-full"
+                      onClick={() => notify("info", "Google sign-in is coming soon.")}
+                      icon={<GoogleIcon />}
+                    >
+                      Sign in with Google
+                    </Button>
+                  )}
                 </form>
               ) : (
                 <form onSubmit={handleRegister} className="space-y-3">
