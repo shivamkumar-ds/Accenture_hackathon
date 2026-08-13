@@ -443,3 +443,111 @@ conditions.
   this project (frontend is feature-frozen); reporting is served entirely through the
   existing `/evaluation` and `/approval` JSON APIs the Decision/Evidence screens already
   consume. Nothing to audit here — confirmed absent, not skipped.
+
+---
+
+## Bug #005
+
+**Title:** `auth_provider` Postgres enum type created with the wrong casing — every user
+registration/login failed against a real database
+
+**Status:** Closed — 13 August 2026
+
+**Date:** 13 August 2026
+
+**Severity:** Critical (blocks every registration and login — the entire product is
+unusable)
+
+**Category:** Backend / Database migration
+
+### Symptoms
+
+- Registration ("Create your workspace") and login both failed in the frontend with a
+  generic `Network Error` toast — no distinguishable HTTP error surfaced to the user.
+- The actual backend exception, visible only in the server terminal:
+  `sqlalchemy.exc.DataError: (psycopg2.errors.InvalidTextRepresentation) invalid input
+  value for enum auth_provider: "LOCAL"`, raised on every `INSERT INTO users`.
+- This was reported as a suspected network/connectivity issue (a genuinely reasonable
+  first read of "Network Error" from the frontend) and investigated as one first, per the
+  project's engineering rule — see "How this was investigated" below.
+
+### Root Cause
+
+The `auth_provider` Postgres enum type was created (migration `a1b2c3d4e5f6`, Phase 2:
+Google Authentication) with **lowercase** labels: `sa.Enum('local', 'google',
+name='auth_provider')`. Every other enum column in this schema — `user_role`,
+`user_status`, `document_processing_status`, `mission_status`, and the rest, all defined
+in the original `3d8622ed98f0` schema migration — uses **uppercase** labels matching the
+Python enum member's `.name` (`'ADMINISTRATOR'`, `'ACTIVE'`, `'PENDING'`, ...), because
+SQLAlchemy's `Enum(SomePythonEnum)` column type, with no `values_callable` override
+anywhere in this codebase, always serializes using `.name`, never `.value`. `AuthProvider`
+was defined the same way as every other enum (`LOCAL = "local"`, `GOOGLE = "google"`), so
+the ORM tried to write `'LOCAL'` — a label that simply did not exist in the Postgres type,
+which only had `'local'`/`'google'`. Postgres correctly rejected the insert.
+
+This is a pure casing mismatch introduced by not following the established (if implicit)
+convention already present everywhere else in the schema — not a logic error, not a
+concurrency issue, not related to migration guard, storage, or anything else touched
+during Phase 3.
+
+### How this was investigated
+
+The founder's report was "Network Error" on submit, with no assumption from either side
+about frontend vs. backend. Investigation order, per the engineering rule (reproduce
+before fixing):
+1. Ruled out the LLM/Vertex AI configuration in the founder's local `.env`
+   (`GEMINI_AUTH_MODE=vertex`) as a red herring — confirmed `get_llm_client()` only
+   constructs a client for whichever provider `LLM_PROVIDER` actually selects (`openai`
+   in this case), and neither `/auth/register` nor `/auth/login` ever calls the LLM client
+   at all.
+2. Requested the actual backend terminal output rather than guessing further — "Network
+   Error" alone is consistent with several genuinely different causes (backend not
+   running, a CORS origin mismatch, or a crash), and only the real evidence could
+   distinguish between them.
+3. The founder's terminal output contained the full traceback and the exact failing SQL
+   statement with its bound parameters (`'auth_provider': 'LOCAL'`) — this is what made
+   the root cause certain rather than inferred.
+4. Cross-checked every other enum column's migration DDL against this one and found the
+   casing convention this migration broke, confirming *why* this specific column failed
+   and no others ever had.
+
+### Fix
+
+New migration `b2c3d4e5f6a7` (fix-forward, not an edit to the already-applied
+`a1b2c3d4e5f6` — per the standing rule that Alembic history stays authoritative once a
+migration may have been applied by anyone): `ALTER TYPE auth_provider RENAME VALUE 'local'
+TO 'LOCAL'` and `... 'google' TO 'GOOGLE'`, plus resetting the column's `SET DEFAULT` to
+match. Running `alembic upgrade head` again applies this on top of the already-migrated
+local database.
+
+### Prevention
+
+`backend/tests/test_auth_provider_enum_migration.py` — two tests. The first asserts the
+model's own compiled `Enum` type produces exactly the label set `AuthProvider`'s member
+*names* would produce (the actual, permanent serialization contract for this and every
+other enum column here). The second directly inspects the fix migration's source for its
+literal `RENAME VALUE` statements and asserts every one renames to the correct uppercase
+form. Neither requires a live Postgres connection — see the Engineering Rule below for why
+that matters.
+
+### Engineering Rule
+
+**A Postgres-backed `Enum` column's migration-declared labels must always be the Python
+enum class's member *names*, in the exact casing they appear in code — never hand-typed,
+never the member's `.value`.** This project has no `values_callable` override anywhere, so
+`.name` is always what gets written; a migration that types out labels by hand (as opposed
+to deriving them, e.g. via `[m.name for m in SomeEnum]`) can silently diverge from that,
+and — critically — **this class of bug is invisible to this project's entire test suite**,
+because every other test runs against in-memory SQLite, which stores enum-typed columns as
+plain strings and never enforces Postgres's `CREATE TYPE ... AS ENUM` label constraint at
+all. `test_auth_provider_enum_migration.py`'s pattern (assert the model's compiled label
+set, then statically inspect any migration that hand-types enum DDL) is the template for
+catching this class of bug for any future Postgres-backed enum column, without needing a
+live Postgres connection to do it.
+
+### Closure
+
+Closed 13 August 2026. Verified: full backend suite (41/41, including the new tests)
+passing, single linear Alembic head (`b2c3d4e5f6a7`) confirmed via `alembic history`, fix
+migration reviewed against every other existing enum migration in the schema to confirm no
+other column shares this defect.
