@@ -179,6 +179,17 @@ class Settings(BaseSettings):
     migration_guard_enabled: bool = True
     migration_guard_fail_on_mismatch: bool = True
 
+    # Google Authentication (Phase 2). This is the OAuth 2.0 Client ID
+    # created in Google Cloud Console (APIs & Services -> Credentials ->
+    # OAuth client ID -> Web application) -- a public identifier, safe to
+    # also embed in the frontend, used here only to verify that an
+    # incoming ID token was actually issued for *this* app (the `aud`
+    # claim) and not lifted from some other Google-authenticated site.
+    # Empty by default: POST /auth/google fails fast with a clear
+    # configuration error rather than silently accepting tokens for any
+    # audience if this is never set.
+    google_oauth_client_id: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @model_validator(mode="after")

@@ -24,6 +24,25 @@ class UserStatus(str, enum.Enum):
     INACTIVE = "inactive"
 
 
+class AuthProvider(str, enum.Enum):
+    """
+    How a User authenticates (Phase 2: Google Authentication). LOCAL is the
+    existing password_hash + bcrypt path, unchanged. GOOGLE means the user
+    signs in exclusively via Google ID token verification -- password_hash
+    is None for these accounts, never a random/unusable placeholder, so
+    "this account has no password" is a real, queryable fact rather than
+    an implied one.
+
+    Deliberately a fact about the account, not a permission -- a GOOGLE
+    account still goes through the exact same User row, company_id, role,
+    and RBAC checks as a LOCAL account. This is what "integrated into the
+    existing user model, not parallel auth logic" means in practice.
+    """
+
+    LOCAL = "local"
+    GOOGLE = "google"
+
+
 class DocumentProcessingStatus(str, enum.Enum):
     PENDING = "pending"
     PROCESSING = "processing"

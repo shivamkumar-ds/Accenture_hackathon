@@ -19,6 +19,13 @@ python-docx==1.1.2
 openai==1.109.1
 google-genai==2.12.1
 
+# Google Authentication (Phase 2) -- ID token verification only (no OAuth
+# flow/redirect handling needed server-side; the frontend uses Google
+# Identity Services to obtain the token). Version range matches what
+# google-genai already requires (>=2.48.1,<2.56.0) so both dependencies
+# resolve to one shared google-auth install, not two conflicting pins.
+google-auth>=2.48.1,<2.56.0
+
 # Testing (M11.5) — committed offline verification harness for the LLM
 # provider layer (see tests/agents/test_llm_client.py).
 pytest==8.3.4

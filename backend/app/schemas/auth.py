@@ -10,6 +10,15 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    """The ID token (JWT) returned to the frontend by Google Identity
+    Services after the user completes the Google sign-in prompt --
+    verified server-side in auth_service.login_with_google(), never
+    trusted as-is."""
+
+    id_token: str
+
+
 class RegisterRequest(BaseModel):
     """
     Creates a brand-new Company and its first Administrator together.

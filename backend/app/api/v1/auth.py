@@ -7,7 +7,7 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.models import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import GoogleLoginRequest, LoginRequest, RegisterRequest, TokenResponse
 from app.schemas.user import UserRead
 from app.services import auth_service
 
@@ -29,6 +29,17 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
 @limiter.limit("10/minute")
 def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     token, user = auth_service.login(db, payload.email, payload.password)
+    return TokenResponse(access_token=token, user=UserRead.model_validate(user))
+
+
+# 10/minute per IP -- same brute-force posture as password login. A stolen
+# ID token is bounded by the same throttle, and the underlying Google
+# signature/expiry verification already rejects a replayed/expired token
+# regardless of rate.
+@router.post("/google", response_model=TokenResponse)
+@limiter.limit("10/minute")
+def google_login(request: Request, payload: GoogleLoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    token, user = auth_service.login_with_google(db, payload.id_token)
     return TokenResponse(access_token=token, user=UserRead.model_validate(user))
 
 
