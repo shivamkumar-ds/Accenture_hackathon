@@ -7,7 +7,7 @@ tenant's, regardless of role.
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -73,6 +73,15 @@ def download_document(
     db: Session = Depends(get_db),
 ) -> FileResponse:
     document = document_service.get_document(db, document_id, current_user.company_id)
+
+    # GCS backend (Phase 3: GCP deployment): a short-lived signed URL,
+    # so the client downloads directly from Cloud Storage rather than the
+    # request being proxied byte-for-byte through Cloud Run. Local backend:
+    # generate_download_url() returns None, falling through to the
+    # existing FileResponse behavior, completely unchanged.
+    signed_url = storage.generate_download_url(document.storage_path)
+    if signed_url is not None:
+        return RedirectResponse(url=signed_url)
 
     file_path = storage.resolve_path(document.storage_path)
     if not file_path.exists():

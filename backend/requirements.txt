@@ -26,6 +26,12 @@ google-genai==2.12.1
 # resolve to one shared google-auth install, not two conflicting pins.
 google-auth>=2.48.1,<2.56.0
 
+# Document storage on Cloud Run (Phase 3) -- only actually used when
+# STORAGE_BACKEND=gcs (app/core/storage.py imports it lazily, inside the
+# one function that needs it); harmless to always install since it's a
+# small, dependency-light package.
+google-cloud-storage==2.18.2
+
 # Testing (M11.5) — committed offline verification harness for the LLM
 # provider layer (see tests/agents/test_llm_client.py).
 pytest==8.3.4

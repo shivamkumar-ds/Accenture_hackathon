@@ -10,6 +10,7 @@ every other service in this codebase.
 import logging
 import uuid
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -87,11 +88,14 @@ async def build_capability_from_document(
     document.processing_status = DocumentProcessingStatus.PROCESSING
     db.commit()
 
-    file_path = storage.resolve_path(document.storage_path)
-    extension = file_path.suffix.lower()
+    extension = Path(document.storage_path).suffix.lower()
 
     try:
-        result = await capability_builder.build_capability(file_path, extension, entity_type)
+        # local_file_for_read() is backend-agnostic (Phase 3: GCP
+        # deployment) -- see tender_service.run_analysis() for the same
+        # pattern and the full reasoning.
+        with storage.local_file_for_read(document.storage_path) as file_path:
+            result = await capability_builder.build_capability(file_path, extension, entity_type)
     except Exception as exc:
         # Covers both document_parser failures and LLM call failures --
         # build_capability() calls both, and either can land here.

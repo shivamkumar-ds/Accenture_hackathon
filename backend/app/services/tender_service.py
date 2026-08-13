@@ -128,8 +128,13 @@ async def run_analysis(
             raise ExtractionError(
                 f"Tender '{tender_id}' references a document that no longer exists."
             )
-        file_path = storage.resolve_path(document.storage_path)
-        results = await tender_analyzer.analyze_tender(file_path, provider=provider)
+        # local_file_for_read() is backend-agnostic (Phase 3: GCP
+        # deployment) -- downloads from GCS to a temp file first when
+        # STORAGE_BACKEND=gcs, yields the existing on-disk path unchanged
+        # otherwise. analyze_tender() always receives a real local Path
+        # either way.
+        with storage.local_file_for_read(document.storage_path) as file_path:
+            results = await tender_analyzer.analyze_tender(file_path, provider=provider)
     except Exception as exc:
         tender.processing_status = DocumentProcessingStatus.FAILED.value
         db.commit()

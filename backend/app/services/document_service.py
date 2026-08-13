@@ -51,7 +51,12 @@ async def upload_document(
             file.filename,
         )
         db.rollback()
-        storage.resolve_path(relative_path).unlink(missing_ok=True)
+        # storage.delete_file() (not resolve_path().unlink()) -- backend-
+        # agnostic (Phase 3: GCP deployment). The old local-only cleanup
+        # left an orphaned GCS blob behind on this exact failure path once
+        # STORAGE_BACKEND=gcs, since resolve_path() only ever produces a
+        # local filesystem path that was never actually written to.
+        storage.delete_file(relative_path)
         raise
     db.refresh(document)
     return document

@@ -75,6 +75,19 @@ class Settings(BaseSettings):
     storage_root: str = "storage"
     max_upload_size_mb: int = 50
 
+    # Storage backend (Phase 3: GCP deployment). "local" (default, unchanged
+    # from M2) writes under storage_root on the container's own filesystem
+    # -- fine for local dev, but Cloud Run's filesystem is ephemeral and not
+    # shared across instances, so anything written there is not durable
+    # application storage in production. "gcs" switches every document
+    # read/write/delete to a Google Cloud Storage bucket instead, using the
+    # exact same {company_id}/documents/{uuid}.{ext} key layout the local
+    # backend already used as its relative path -- no document metadata
+    # (Document.storage_path in the database) changes shape at all between
+    # the two backends. Required when storage_backend="gcs".
+    storage_backend: str = "local"
+    gcs_bucket_name: str = ""
+
     # LLM provider. "mock" (default — every real provider is opt-in via
     # explicit configuration, per ADR-001; this default never changes
     # silently), "openai" (operational reference implementation — the only
@@ -209,6 +222,19 @@ class Settings(BaseSettings):
     google_oauth_client_id: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    @model_validator(mode="after")
+    def _validate_storage_backend(self) -> "Settings":
+        """Same fail-fast-at-startup posture as GEMINI_AUTH_MODE below --
+        an invalid or incomplete storage configuration should be impossible
+        to accidentally boot with, not discovered on the first upload."""
+        if self.storage_backend not in ("local", "gcs"):
+            raise ValueError(
+                f"STORAGE_BACKEND must be 'local' or 'gcs', got {self.storage_backend!r}."
+            )
+        if self.storage_backend == "gcs" and not self.gcs_bucket_name:
+            raise ValueError("STORAGE_BACKEND=gcs requires GCS_BUCKET_NAME to be set.")
+        return self
 
     @model_validator(mode="after")
     def _validate_gemini_auth_mode(self) -> "Settings":
