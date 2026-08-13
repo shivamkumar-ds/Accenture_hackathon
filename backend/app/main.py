@@ -5,15 +5,18 @@ BidOps AI — Application entrypoint.
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.database import engine
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging
 from app.core.migration_guard import MigrationOutOfDateError, check_migrations_current
@@ -118,5 +121,34 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/health", tags=["infrastructure"])
 def health_check() -> dict:
-    """Unversioned infrastructure health check — not part of the business API."""
+    """
+    Liveness only: is the process itself up and able to handle a request?
+    Deliberately does nothing else -- no DB call, no AI call -- so Cloud
+    Run's liveness probe (which restarts the container on repeated
+    failures) never fires because of a transient database or LLM-provider
+    issue that has nothing to do with the process itself being alive.
+    """
     return {"status": "ok", "environment": settings.app_env}
+
+
+@app.get("/health/db", tags=["infrastructure"])
+def health_check_db() -> JSONResponse:
+    """
+    Readiness: can this instance actually reach the database? Deliberately
+    separate from /health (Phase 3: GCP deployment) -- a Cloud Run
+    readiness probe should stop routing traffic to an instance that can't
+    reach Cloud SQL, but a liveness probe restarting the container
+    wouldn't fix a database outage and would just thrash the process
+    instead. One cheap `SELECT 1` against the existing connection pool --
+    no AI calls, no document processing, nothing expensive.
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("Database readiness check failed")
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "unavailable", "database": "unreachable"},
+        )
+    return JSONResponse(content={"status": "ok", "database": "reachable"})

@@ -38,6 +38,24 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg2://bidops:bidops@localhost:5432/bidops"
 
+    # Connection pool sizing (Phase 3: GCP deployment). Deliberately small
+    # defaults -- on Cloud Run, every concurrent container instance holds
+    # its own independent pool, so a large per-instance pool multiplies
+    # into far more simultaneous Cloud SQL connections than intended as
+    # traffic scales instances up. 5+2=7 max connections per instance is
+    # conservative and matches Cloud SQL for PostgreSQL's own default
+    # max_connections headroom for an early-stage deployment; raise this
+    # deliberately (and raise Cloud SQL's max_connections to match) if
+    # instance count or per-instance concurrency grows.
+    db_pool_size: int = 5
+    db_max_overflow: int = 2
+    # Recycles a pooled connection after this many seconds, closing it
+    # proactively rather than waiting to discover Cloud SQL (or any
+    # managed proxy in front of it) has already dropped it. pool_pre_ping
+    # (below, always on) already guards against using a dead connection;
+    # this reduces how often pre_ping actually has to catch one.
+    db_pool_recycle_seconds: int = 1800
+
     # JWT auth (M1). The default secret_key is dev-only — any real
     # deployment must override this via the environment, never ship
     # the default. Enforced below, not just documented: _validate_secret_key

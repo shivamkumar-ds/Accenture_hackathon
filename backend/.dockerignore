@@ -1,0 +1,26 @@
+# Never baked into the image -- config comes from Cloud Run env vars /
+# Secret Manager at runtime, not a bundled file.
+.env
+.env.*
+!.env.example
+
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+
+tests/
+
+# Local-disk document storage (dev-only fallback -- see
+# docs/DEPLOYMENT.md's File Storage section). Never ship whatever a
+# developer happens to have uploaded locally.
+storage/
+
+.git/
+.gitignore
+README.md
+99_DECISIONS_LOG.md
