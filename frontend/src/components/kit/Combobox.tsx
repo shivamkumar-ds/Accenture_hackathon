@@ -31,12 +31,26 @@ export function Combobox({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Opens upward when there isn't enough room below the trigger for the
+  // panel (roughly its own height, ~260px with the search box + option
+  // list) but there is room above -- e.g. this field sitting near the
+  // bottom of a form/card, where opening downward would spill past the
+  // card edge or get clipped. Recomputed each time the panel opens
+  // rather than tracked continuously, since it only matters at open time.
+  const [openUpward, setOpenUpward] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
+    const PANEL_HEIGHT_ESTIMATE = 260;
+    const trigger = rootRef.current?.getBoundingClientRect();
+    if (trigger) {
+      const spaceBelow = window.innerHeight - trigger.bottom;
+      const spaceAbove = trigger.top;
+      setOpenUpward(spaceBelow < PANEL_HEIGHT_ESTIMATE && spaceAbove > spaceBelow);
+    }
     // Focus the search box the moment the panel opens, so typing to
     // filter works immediately without an extra click.
     requestAnimationFrame(() => searchRef.current?.focus());
@@ -78,7 +92,10 @@ export function Combobox({
         {open && (
           <div
             role="listbox"
-            className="absolute z-20 mt-1.5 w-full rounded-md border border-border bg-surface shadow-elevated overflow-hidden animate-fade-in"
+            className={cn(
+              "absolute z-20 w-full rounded-md border border-border bg-surface shadow-elevated overflow-hidden animate-fade-in",
+              openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
+            )}
           >
             <div className="relative border-b border-border">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
