@@ -140,6 +140,7 @@ Phase 3 target — no customers on it yet), there is nothing to copy.
 | `LLM_PROVIDER`, `*_MODEL`, `*_TIMEOUT_SECONDS`, `*_MAX_RETRIES`, `*_RETRY_BACKOFF_SECONDS` | Provider selection and robustness tuning |
 | `GEMINI_AUTH_MODE`, `GOOGLE_CLOUD_LOCATION` | Non-secret Gemini/Vertex config |
 | `CAPABILITY_STALENESS_DAYS`, `TENDER_CHUNK_PAGE_SIZE`, `MAX_OPTIONAL_REVIEW_ITEMS`, `MAX_UPLOAD_SIZE_MB` | Business tuning, non-secret |
+| `CONTACT_SENDER_EMAIL`, `CONTACT_NOTIFICATION_EMAIL` | Contact form email delivery (see secrets table below for `RESEND_API_KEY`) — `CONTACT_SENDER_EMAIL` must be an address/domain verified with Resend |
 
 ### Backend secrets — Secret Manager, never plain env vars in production
 
@@ -150,6 +151,7 @@ Phase 3 target — no customers on it yet), there is nothing to copy.
 | `GOOGLE_OAUTH_CLIENT_ID` | — (not secret, but still server config; can stay a plain env var) | Public identifier, listed here only because it pairs with the backend's ID-token verification |
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` / `QWEN_API_KEY` | `bidops-openai-key` / `bidops-gemini-key` / `bidops-qwen-key` | Only the key(s) for `LLM_PROVIDER` actually in use are required |
 | `GCS_BUCKET_NAME` | — (not secret) | Plain env var is fine |
+| `RESEND_API_KEY` | `bidops-resend-key` | Contact form email delivery (see `app/core/email.py`) — if unset, the app still runs, and contact form submissions still persist; only the two notification/confirmation emails are honestly recorded as not-sent (`ContactSubmission.notification_status`/`confirmation_status`) |
 
 Never expose any of the above through a `VITE_*` variable — that would
 ship it into the public frontend bundle. Never commit real values;
@@ -222,8 +224,8 @@ gcloud run deploy bidops-api \
   --allow-unauthenticated \
   --max-instances=1 \
   --add-cloudsql-instances=PROJECT_ID:REGION:bidops-db \
-  --set-secrets=DATABASE_URL=bidops-database-url:latest,SECRET_KEY=bidops-jwt-secret:latest,OPENAI_API_KEY=bidops-openai-key:latest \
-  --set-env-vars=APP_ENV=production,LLM_PROVIDER=openai,STORAGE_BACKEND=gcs,GCS_BUCKET_NAME=bidops-documents-PROJECT_ID,ALLOWED_ORIGINS=https://YOUR-FIREBASE-SITE.web.app,GOOGLE_OAUTH_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
+  --set-secrets=DATABASE_URL=bidops-database-url:latest,SECRET_KEY=bidops-jwt-secret:latest,OPENAI_API_KEY=bidops-openai-key:latest,RESEND_API_KEY=bidops-resend-key:latest \
+  --set-env-vars=APP_ENV=production,LLM_PROVIDER=openai,STORAGE_BACKEND=gcs,GCS_BUCKET_NAME=bidops-documents-PROJECT_ID,ALLOWED_ORIGINS=https://YOUR-FIREBASE-SITE.web.app,GOOGLE_OAUTH_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com,CONTACT_SENDER_EMAIL=YOUR_VERIFIED_SENDER@yourdomain.com,CONTACT_NOTIFICATION_EMAIL=bidops.ai@gmail.com
 
 # 6. Frontend
 cd ../frontend
