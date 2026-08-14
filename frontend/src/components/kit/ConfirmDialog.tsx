@@ -51,7 +51,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/25 animate-fade-in"
       onClick={() => !loading && onCancel()}
     >
       <div
@@ -59,7 +59,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-lg border border-border bg-surface shadow-elevated"
+        className="w-full max-w-sm rounded-lg border border-border bg-surface shadow-hero"
       >
         <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-1">
           <h2 id="confirm-dialog-title" className="text-sm font-semibold tracking-tight">
