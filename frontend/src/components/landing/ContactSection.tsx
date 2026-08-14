@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Headphones, Mail, MessageSquare, Send, ShieldCheck } from "lucide-react";
+import { submitContactForm } from "../../api/endpoints";
+import { extractErrorMessage } from "../../api/client";
+import { useToast } from "../../context/ToastContext";
 import { Button, Input, Select } from "../kit";
 
 // Real, already-established contact channel used everywhere else on the
@@ -46,30 +49,44 @@ const initialForm = {
   phone: "",
   subject: "",
   message: "",
+  // Honeypot -- a real visitor never sees or fills this (visually hidden
+  // below, not just `type="hidden"`, since some bots skip those). Left
+  // non-empty on submit, the backend silently discards the request
+  // without persisting it or sending any email. See ContactRequest in
+  // backend/app/schemas/contact.py.
+  website: "",
 };
 
 export function ContactSection() {
   const [form, setForm] = useState(initialForm);
+  const [submitting, setSubmitting] = useState(false);
+  const { notify } = useToast();
 
   function update<K extends keyof typeof initialForm>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const body = [
-      `Name: ${form.fullName}`,
-      `Company: ${form.companyName || "—"}`,
-      `Job Title: ${form.jobTitle || "—"}`,
-      `Phone: ${form.phone || "—"}`,
-      "",
-      form.message,
-    ].join("\n");
-    const mailto =
-      `mailto:${CONTACT_EMAIL}?subject=` +
-      encodeURIComponent(form.subject || "Contact form inquiry — BidOps") +
-      `&body=${encodeURIComponent(body)}`;
-    window.location.href = mailto;
+    setSubmitting(true);
+    try {
+      await submitContactForm({
+        full_name: form.fullName,
+        work_email: form.workEmail,
+        company_name: form.companyName || null,
+        job_title: form.jobTitle || null,
+        phone: form.phone || null,
+        subject: form.subject,
+        message: form.message,
+        website: form.website,
+      });
+      notify("success", "Thanks for reaching out — we'll be in touch shortly.");
+      setForm(initialForm);
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -181,12 +198,29 @@ export function ContactSection() {
                 />
               </label>
 
+              {/* Honeypot -- visually hidden (not type="hidden", which
+                  some bots skip), unreachable by keyboard tab order, and
+                  never announced to assistive tech. A real visitor never
+                  interacts with this; see the `website` field's docstring
+                  in api/types.ts. */}
+              <label className="absolute w-px h-px overflow-hidden opacity-0 pointer-events-none" aria-hidden="true">
+                Leave this field empty
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={form.website}
+                  onChange={(e) => update("website", e.target.value)}
+                />
+              </label>
+
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <ShieldCheck size={13} className="text-primary shrink-0" />
-                We respect your privacy. Your information will never be shared.
+                We respect your privacy. Your details are used only to respond to your message.
               </p>
 
-              <Button type="submit" size="lg" className="w-full" icon={<Send size={15} />}>
+              <Button type="submit" size="lg" className="w-full" loading={submitting} icon={<Send size={15} />}>
                 Send Message
               </Button>
             </form>

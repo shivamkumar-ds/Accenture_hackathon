@@ -65,6 +65,27 @@ export interface GoogleLoginRequest {
   id_token: string;
 }
 
+// POST /api/v1/contact -- the public landing page's "Contact Us" form.
+// Unauthenticated by design (a visitor submitting this has, by
+// definition, no BidOps account yet). `website` is a honeypot: a hidden
+// field a real visitor never sees or fills (see ContactSection.tsx) --
+// always sent as an empty string by the real form.
+export interface ContactRequest {
+  full_name: string;
+  work_email: string;
+  company_name?: string | null;
+  job_title?: string | null;
+  phone?: string | null;
+  subject: string;
+  message: string;
+  website?: string;
+}
+
+export interface ContactResponse {
+  id: string;
+  created_at: string;
+}
+
 export interface CompanyRead {
   id: string;
   name: string;

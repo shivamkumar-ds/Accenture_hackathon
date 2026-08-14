@@ -5,6 +5,8 @@ import type {
   CapabilityGraphResponse,
   ComplianceMatrixEntryRead,
   CompanyRead,
+  ContactRequest,
+  ContactResponse,
   DocumentRead,
   EvaluationResponse,
   GoogleLoginRequest,
@@ -35,6 +37,14 @@ export const getProfile = () => apiClient.get<UserRead>("/api/v1/auth/profile").
 // for the full reasoning.
 export const googleLogin = (payload: GoogleLoginRequest) =>
   apiClient.post<TokenResponse>("/api/v1/auth/google", payload).then((r) => r.data);
+
+// --- contact ---
+
+// Public landing page "Contact Us" form -- no auth token required (and
+// none is sent even if a stale one happens to be in localStorage; the
+// backend endpoint ignores it either way).
+export const submitContactForm = (payload: ContactRequest) =>
+  apiClient.post<ContactResponse>("/api/v1/contact", payload).then((r) => r.data);
 
 // --- company ---
 
