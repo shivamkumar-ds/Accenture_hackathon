@@ -127,6 +127,30 @@ class BusinessDecision(str, enum.Enum):
     NEEDS_REVISION = "needs_revision"
 
 
+class ContactEmailStatus(str, enum.Enum):
+    """
+    Honest per-email delivery status for a ContactSubmission row (Contact
+    Form Backend). Deliberately NOT a proxy for whether the submission
+    itself succeeded -- the submission is durable the moment its DB row
+    commits (see contact_service.submit_contact_form), independent of
+    either email outcome. PENDING is the default set at insert time and
+    is only ever a transient state within a single request (this is a
+    synchronous send, not a queue) -- it exists so a row is never left
+    with no status at all if the process crashes between the insert and
+    the email attempt, matching the same PENDING-first convention as
+    DocumentProcessingStatus/VerificationStatus elsewhere in this schema.
+    SENT means the provider (Resend) accepted the message. FAILED covers
+    every case where that didn't happen, including the provider not
+    being configured at all (RESEND_API_KEY unset) -- both are equally
+    "this email did not go out," and notification_error/confirmation_error
+    on the model records which one it was.
+    """
+
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+
+
 class CapabilityEntityType(str, enum.Enum):
     """Which of the five capability tables a Capability Mapping row points to."""
 

@@ -9,6 +9,7 @@ be silently missing from what SQLAlchemy knows about.
 from app.models.audit import AuditLog
 from app.models.capability import Certification, Employee, Equipment, FinancialRecord, Project
 from app.models.company import Company, User
+from app.models.contact import ContactSubmission
 from app.models.document import Document
 from app.models.mission import CapabilitySnapshot, Mission
 from app.models.recommendation import ComplianceMatrix, Recommendation
@@ -24,6 +25,7 @@ __all__ = [
     "Project",
     "Company",
     "User",
+    "ContactSubmission",
     "Document",
     "CapabilitySnapshot",
     "Mission",
