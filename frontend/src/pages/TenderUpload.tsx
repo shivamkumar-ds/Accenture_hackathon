@@ -28,6 +28,50 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Compact file-preview row -- shared by the primary document (once
+// selected) and every additional document row, so both look like the
+// same "this file is attached" affordance rather than two different
+// visual languages. `bare` drops the row's own border/radius/background
+// for use inside a single divided list container (additional documents);
+// without it, the row is a standalone bordered card (primary document).
+function FileRow({
+  file,
+  onRemove,
+  disabled,
+  bare = false,
+}: {
+  file: File;
+  onRemove: () => void;
+  disabled?: boolean;
+  bare?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2.5 px-3 py-2.5",
+        !bare && "rounded-lg border border-border bg-muted/60"
+      )}
+    >
+      <div className="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+        <FileText size={12} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium truncate">{file.name}</p>
+      </div>
+      <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{formatBytes(file.size)}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled}
+        className="text-muted-foreground hover:text-danger transition shrink-0 disabled:opacity-50"
+        aria-label={`Remove ${file.name}`}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
 export default function TenderUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
@@ -179,9 +223,9 @@ export default function TenderUpload() {
       </div>
       <Card>
         <CardHeader title="Tender Details" />
-        <CardBody>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-4">
+        <CardBody className="px-5 py-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div className="space-y-3.5">
               <Input
                 label="Tender Name"
                 required
@@ -220,12 +264,16 @@ export default function TenderUpload() {
                 <p className="text-xs text-muted-foreground text-center -mt-2">{uploadStatus}</p>
               )}
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
                   Primary Tender Document
                 </p>
-                <Dropzone file={file} onFileSelected={handleFileSelected} hint="Tender PDF, up to 50MB" className="min-h-[160px]" />
+                {file ? (
+                  <FileRow file={file} onRemove={() => handleFileSelected(null)} disabled={loading} />
+                ) : (
+                  <Dropzone file={null} onFileSelected={handleFileSelected} hint="Tender PDF, up to 50MB" compact />
+                )}
               </div>
 
               {/* Additional Tender Documents -- multi-document Tender
@@ -235,7 +283,7 @@ export default function TenderUpload() {
                   flow that creates the Tender, rather than requiring a
                   separate trip to Tender Workspace afterward. */}
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Additional Tender Documents
                   </p>
@@ -262,37 +310,21 @@ export default function TenderUpload() {
                 </div>
 
                 {additionalFilesError && (
-                  <p className="text-xs text-danger mb-2">{additionalFilesError}</p>
+                  <p className="text-xs text-danger mb-1.5">{additionalFilesError}</p>
                 )}
 
                 {additionalFiles.length > 0 ? (
-                  <ul className="space-y-1.5">
+                  <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
                     {additionalFiles.map((f) => (
-                      <li
+                      <FileRow
                         key={f.name}
-                        className={cn(
-                          "flex items-center gap-2.5 rounded-lg border border-border bg-muted/60 px-3 py-2"
-                        )}
-                      >
-                        <div className="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                          <FileText size={12} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium truncate">{f.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{formatBytes(f.size)}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAdditionalFile(f.name)}
-                          disabled={loading}
-                          className="text-muted-foreground hover:text-danger transition shrink-0 disabled:opacity-50"
-                          aria-label={`Remove ${f.name}`}
-                        >
-                          <X size={14} />
-                        </button>
-                      </li>
+                        file={f}
+                        onRemove={() => handleRemoveAdditionalFile(f.name)}
+                        disabled={loading}
+                        bare
+                      />
                     ))}
-                  </ul>
+                  </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     Optional — attach technical bid details, BOQ, or other supporting files (PDF, XLS, XLSX).
