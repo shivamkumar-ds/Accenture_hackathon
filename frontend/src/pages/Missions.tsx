@@ -4,7 +4,7 @@ import { archiveMission, executeMission, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
-import { Badge, Button, Card, CardBody, ConfirmDialog, EmptyState, Input, Menu, MenuItem, Select, SkeletonList } from "../components/kit";
+import { Badge, Button, Card, CardBody, ConfirmDialog, EmptyState, FilterChip, Input, Menu, MenuItem, Select, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
 import { tenderDisplayName } from "../lib/tenderName";
 import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileUp, Loader2, MoreVertical, Radar, Search, Sparkles, Trash2 } from "lucide-react";
@@ -234,6 +234,17 @@ export default function Missions() {
                 <option value="name">Sort: Name (A-Z)</option>
               </Select>
             </div>
+            {/* Direct, one-click access to deleted/archived tenders --
+                the Status dropdown above already includes "Archived" as
+                an option, but it's easy to miss buried in a select. This
+                chip toggles the same statusFilter state, so it's just a
+                second, more visible entry point onto the exact same
+                filter, not a parallel view. */}
+            <FilterChip
+              label="Archived"
+              active={statusFilter === "archived"}
+              onClick={() => setStatusFilter((prev) => (prev === "archived" ? "all" : "archived"))}
+            />
           </CardBody>
         </Card>
       )}
