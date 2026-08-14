@@ -4,7 +4,7 @@ import { archiveMission, executeMission, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
-import { Badge, Button, Card, CardBody, EmptyState, Input, Menu, MenuItem, Select, SkeletonList } from "../components/kit";
+import { Badge, Button, Card, CardBody, ConfirmDialog, EmptyState, Input, Menu, MenuItem, Select, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
 import { tenderDisplayName } from "../lib/tenderName";
 import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileUp, Loader2, MoreVertical, Radar, Search, Sparkles, Trash2 } from "lucide-react";
@@ -104,6 +104,10 @@ export default function Missions() {
   // rather than listing choices that would fail.
   const [provider, setProvider] = useState<"openai">("openai");
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  // The tender pending a delete confirmation -- null means the confirm
+  // dialog is closed. Replaces the old window.confirm() (unstyled, blocks
+  // the tab, can't show a "request in progress" state on its own button).
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<MissionStatus | "all">("all");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
@@ -171,17 +175,14 @@ export default function Missions() {
     }
   };
 
-  const handleDelete = async (missionId: string, name: string) => {
-    if (
-      !confirm(
-        `Delete "${name}"? It will be hidden from the default Tender Workspace view and Dashboard -- you can still find it later using the Archived filter here.`
-      )
-    )
-      return;
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    const { id: missionId, name } = pendingDelete;
     setArchivingId(missionId);
     try {
       await archiveMission(missionId);
       notify("success", `"${name}" deleted.`);
+      setPendingDelete(null);
       await refresh();
     } catch (err) {
       notify("error", extractErrorMessage(err));
@@ -315,7 +316,7 @@ export default function Missions() {
                           <MenuItem
                             icon={<Trash2 size={14} />}
                             danger
-                            onClick={() => handleDelete(m.id, tenderDisplayName(m))}
+                            onClick={() => setPendingDelete({ id: m.id, name: tenderDisplayName(m) })}
                           >
                             {archivingId === m.id ? "Deleting…" : "Delete"}
                           </MenuItem>
@@ -356,6 +357,26 @@ export default function Missions() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete tender?"
+        description={
+          pendingDelete && (
+            <>
+              Are you sure you want to delete <strong className="text-foreground">"{pendingDelete.name}"</strong>?
+              <br />
+              <br />
+              The tender will be hidden from the default Tender Workspace view and Dashboard. You can find it
+              later under the Archived filter here.
+            </>
+          )
+        }
+        confirmLabel="Delete Tender"
+        loading={archivingId === pendingDelete?.id}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

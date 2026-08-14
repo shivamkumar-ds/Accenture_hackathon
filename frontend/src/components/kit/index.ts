@@ -14,3 +14,4 @@ export * from "./Switch";
 export * from "./Menu";
 export * from "./StatusDonut";
 export * from "./Combobox";
+export * from "./ConfirmDialog";
