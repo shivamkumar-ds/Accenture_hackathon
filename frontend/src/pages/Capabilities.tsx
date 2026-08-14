@@ -140,6 +140,21 @@ export default function Capabilities() {
         </p>
       </div>
 
+      {loading ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-surface border border-border rounded-lg p-5 h-24" />
+          ))}
+        </div>
+      ) : graph ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Total" value={graph.summary.total_entities} icon={<Layers size={16} />} tone="primary" />
+          <StatCard label="Current" value={graph.summary.total_current} icon={<Award size={16} />} tone="success" />
+          <StatCard label="Stale" value={graph.summary.total_stale} icon={<Wrench size={16} />} tone="warning" />
+          <StatCard label="Expired" value={graph.summary.total_expired} icon={<Landmark size={16} />} tone="danger" />
+        </div>
+      ) : null}
+
       <Card>
         <CardHeader title="Build Capabilities" description="Run extraction on an uploaded document" />
         <CardBody>
@@ -217,21 +232,8 @@ export default function Capabilities() {
         </CardBody>
       </Card>
 
-      {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-surface border border-border rounded-lg p-5 h-24" />
-          ))}
-        </div>
-      ) : graph ? (
+      {graph && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Total" value={graph.summary.total_entities} icon={<Layers size={16} />} tone="primary" />
-            <StatCard label="Current" value={graph.summary.total_current} icon={<Award size={16} />} tone="success" />
-            <StatCard label="Stale" value={graph.summary.total_stale} icon={<Wrench size={16} />} tone="warning" />
-            <StatCard label="Expired" value={graph.summary.total_expired} icon={<Landmark size={16} />} tone="danger" />
-          </div>
-
           <EntitySection icon={Award} title="Certifications" empty={graph.certifications.length === 0}>
             {graph.certifications.map((c) => (
               <li key={c.id} className="py-3 text-sm flex items-center justify-between gap-3">
@@ -326,7 +328,7 @@ export default function Capabilities() {
             ))}
           </EntitySection>
         </>
-      ) : null}
+      )}
     </div>
   );
 }
