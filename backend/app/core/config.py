@@ -221,6 +221,22 @@ class Settings(BaseSettings):
     # audience if this is never set.
     google_oauth_client_id: str = ""
 
+    # Contact form email delivery (Contact Form Backend feature). All
+    # three default to empty/safe values deliberately -- local dev and
+    # the test suite must both run with zero real Resend credentials
+    # (see app/core/email.py, which treats a missing key or sender as
+    # "email not configured," not a startup error). resend_api_key is a
+    # secret (Secret Manager in production, see docs/DEPLOYMENT.md);
+    # contact_sender_email must be an address/domain verified with
+    # Resend before real sending works -- not invented here, since no
+    # such domain has been configured yet. contact_notification_email
+    # defaults to BidOps's existing, already-public contact address (the
+    # same one the frontend's mailto fallback and Login.tsx's
+    # forgot-password link already use) rather than leaving it unset.
+    resend_api_key: str = ""
+    contact_sender_email: str = ""
+    contact_notification_email: str = "bidops.ai@gmail.com"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @model_validator(mode="after")

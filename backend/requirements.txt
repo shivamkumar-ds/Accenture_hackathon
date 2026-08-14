@@ -40,3 +40,12 @@ pytest-asyncio==0.25.2
 # Rate limiting (RC-2 audit finding H-2) — protects account creation and
 # every LLM-cost-incurring endpoint from unlimited/free abuse.
 slowapi==0.1.10
+
+# Contact form email delivery (Contact Form Backend feature) -- Resend's
+# official SDK. No prior email-sending capability existed in this
+# codebase; Resend was chosen (no further comparison needed per the
+# governing decision) as a transactional email API reachable over plain
+# outbound HTTPS, which is what Cloud Run's egress path supports cleanly
+# (unlike SMTP on 25/587, which can be finicky from some cloud egress
+# paths -- see docs/DEPLOYMENT.md).
+resend==2.36.0
