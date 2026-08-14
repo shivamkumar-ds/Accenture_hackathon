@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { Button } from "./Button";
@@ -49,7 +50,17 @@ export function ConfirmDialog({
 
   if (!open) return null;
 
-  return (
+  // Rendered via a portal straight onto <body> -- Layout.tsx's header is
+  // `sticky top-0 z-30`, which establishes its own stacking context. Left
+  // in place as a normal descendant, this dialog's `fixed inset-0`
+  // overlay was being placed into that same ancestor stacking context and
+  // painting *under* the sticky header despite a higher z-index (z-index
+  // only outranks siblings within the same stacking context, not across
+  // one) -- the header visibly wasn't dimmed. A portal to document.body
+  // sidesteps this entirely: the overlay stacks at the true document
+  // root, above every other stacking context in the app, regardless of
+  // what Layout.tsx does now or in the future.
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/25 animate-fade-in"
       onClick={() => !loading && onCancel()}
@@ -92,6 +103,7 @@ export function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
