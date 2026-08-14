@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { archiveMission, executeMission, listMissions } from "../api/endpoints";
+import { archiveMission, executeMission, listMissions, purgeMission } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import type { MissionRead, MissionStatus } from "../api/types";
 import { Badge, Button, Card, CardBody, ConfirmDialog, EmptyState, FilterChip, Input, Menu, MenuItem, Select, SkeletonList } from "../components/kit";
 import { cn } from "../lib/cn";
 import { tenderDisplayName } from "../lib/tenderName";
-import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileUp, Loader2, MoreVertical, Radar, Search, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, ExternalLink, FileUp, Loader2, MoreVertical, Radar, Search, Sparkles, Trash2, XCircle } from "lucide-react";
 
 // The brief asked for a visual "story" of the tender journey (Upload ->
 // Extraction -> Matching -> Compliance -> Gap Analysis -> Decision Engine
@@ -108,6 +108,13 @@ export default function Missions() {
   // dialog is closed. Replaces the old window.confirm() (unstyled, blocks
   // the tab, can't show a "request in progress" state on its own button).
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  // Separate from pendingDelete/archivingId above -- this is the real,
+  // irreversible purge_mission() call, only ever offered for a row that's
+  // already archived. Kept as its own state (not a flag reused on
+  // pendingDelete) so the two very different confirm dialogs -- "hide it,
+  // recoverable" vs "destroy it, forever" -- can never be conflated.
+  const [pendingPurge, setPendingPurge] = useState<{ id: string; name: string } | null>(null);
+  const [purgingId, setPurgingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<MissionStatus | "all">("all");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
@@ -188,6 +195,22 @@ export default function Missions() {
       notify("error", extractErrorMessage(err));
     } finally {
       setArchivingId(null);
+    }
+  };
+
+  const handleConfirmPurge = async () => {
+    if (!pendingPurge) return;
+    const { id: missionId, name } = pendingPurge;
+    setPurgingId(missionId);
+    try {
+      await purgeMission(missionId);
+      notify("success", `"${name}" permanently deleted.`);
+      setPendingPurge(null);
+      await refresh();
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setPurgingId(null);
     }
   };
 
@@ -318,18 +341,27 @@ export default function Missions() {
                         <MenuItem icon={<ExternalLink size={14} />} onClick={() => navigate(`/missions/${m.id}`)}>
                           Open
                         </MenuItem>
-                        {/* Already-archived rows have nothing left to
-                            delete -- Delete only makes sense from an
-                            active/visible state, so it's hidden rather
-                            than left as a no-op or a re-archive action
-                            nothing in the backend actually supports. */}
-                        {m.status !== "archived" && (
+                        {/* Active rows get the recoverable "hide it"
+                            action; already-archived rows get the real,
+                            irreversible purge_mission() call instead --
+                            re-archiving an already-archived row isn't a
+                            thing the backend supports, so these two menu
+                            items are mutually exclusive per row. */}
+                        {m.status !== "archived" ? (
                           <MenuItem
                             icon={<Trash2 size={14} />}
                             danger
                             onClick={() => setPendingDelete({ id: m.id, name: tenderDisplayName(m) })}
                           >
                             {archivingId === m.id ? "Deleting…" : "Delete"}
+                          </MenuItem>
+                        ) : (
+                          <MenuItem
+                            icon={<XCircle size={14} />}
+                            danger
+                            onClick={() => setPendingPurge({ id: m.id, name: tenderDisplayName(m) })}
+                          >
+                            {purgingId === m.id ? "Deleting…" : "Delete Permanently"}
                           </MenuItem>
                         )}
                       </Menu>
@@ -387,6 +419,27 @@ export default function Missions() {
         loading={archivingId === pendingDelete?.id}
         onConfirm={handleConfirmDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingPurge !== null}
+        title="Permanently delete tender?"
+        description={
+          pendingPurge && (
+            <>
+              Are you sure you want to permanently delete{" "}
+              <strong className="text-foreground">"{pendingPurge.name}"</strong>?
+              <br />
+              <br />
+              This removes the tender, its requirements, documents, and evaluation history for good.{" "}
+              <strong className="text-foreground">This cannot be undone.</strong>
+            </>
+          )
+        }
+        confirmLabel="Delete Permanently"
+        loading={purgingId === pendingPurge?.id}
+        onConfirm={handleConfirmPurge}
+        onCancel={() => setPendingPurge(null)}
       />
     </div>
   );

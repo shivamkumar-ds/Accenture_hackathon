@@ -180,6 +180,14 @@ export const executeMission = (missionId: string, provider?: "openai") =>
 export const archiveMission = (missionId: string) =>
   apiClient.delete<MissionRead>(`/api/v1/missions/${missionId}`).then((r) => r.data);
 
+// Real, permanent deletion -- only succeeds server-side for an already-
+// archived mission (mission_service.purge_mission's own ConflictError
+// otherwise). Deliberately a separate call from archiveMission() above,
+// not a flag on it: "hide it, recoverable" and "destroy it, irreversible"
+// should never be one accidental parameter apart.
+export const purgeMission = (missionId: string) =>
+  apiClient.delete<void>(`/api/v1/missions/${missionId}/purge`).then(() => undefined);
+
 // --- approval / Bid Decision ---
 // "AI advises, human decides" -- this is the write path for the Bid
 // Decision feature (docs/BID_DECISION_DESIGN.md). Backed by the existing

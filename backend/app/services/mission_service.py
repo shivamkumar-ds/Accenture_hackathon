@@ -18,7 +18,19 @@ import uuid
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, Mission, Tender
+from app.core import storage
+from app.models import (
+    AuditLog,
+    CapabilityMapping,
+    CapabilitySnapshot,
+    ComplianceMatrix,
+    Document,
+    LLMCallEvent,
+    Mission,
+    Recommendation,
+    Requirement,
+    Tender,
+)
 from app.models.enums import DocumentProcessingStatus, MissionStatus
 from app.services.exceptions import ConflictError, ExtractionError, NotFoundError
 
@@ -51,6 +63,111 @@ def archive_mission(db: Session, mission_id: uuid.UUID, company_id: uuid.UUID) -
     db.commit()
     db.refresh(mission)
     return mission
+
+
+def purge_mission(db: Session, mission_id: uuid.UUID, company_id: uuid.UUID) -> None:
+    """
+    Permanently, irreversibly deletes an already-archived Mission and every
+    row that exists only because of it -- the real DELETE that
+    archive_mission() deliberately is not. Only reachable from an already-
+    ARCHIVED mission (ConflictError otherwise): archiving is the
+    recoverable "hide it" step; this is the separate, deliberate,
+    non-recoverable step after that, matching the Tender Workspace's
+    Delete -> Archived -> Delete Permanently flow.
+
+    No ON DELETE CASCADE exists anywhere in this schema (every FK here is
+    the Postgres default RESTRICT) -- deliberately, since a silent
+    cross-table cascade is exactly the kind of thing that should be
+    reviewed in application code, not left to a migration someone wrote
+    for an unrelated reason. So every dependent row is deleted (or, for
+    genuinely independent audit/telemetry history, detached rather than
+    destroyed) explicitly here, in the one order that satisfies every FK
+    in this graph:
+
+      CapabilityMapping (requirement_id) -> ComplianceMatrix
+        (recommendation_id, requirement_id) -> Recommendation (mission_id)
+        -> Requirement (tender_id) -> Document (tender_id) -> Tender
+        (mission_id) -> CapabilitySnapshot (mission_id) -> Mission
+
+    Mission.recommendation_id / capability_snapshot_id are nulled first
+    (they forward-reference rows this function is about to delete —
+    that's exactly why they're declared `use_alter=True` in the model).
+
+    AuditLog and LLMCallEvent rows are NOT deleted -- both columns are
+    already nullable-by-design specifically so telemetry/audit history
+    can outlive the thing it was recorded about (see telemetry.py's own
+    docstring). A compliance-oriented product destroying its own audit
+    trail on a delete is the wrong default; these rows are detached
+    (mission_id set to NULL) instead, preserving the historical record.
+
+    Company capability entities (Certification/Employee/Project/
+    Equipment/FinancialRecord) are never touched — they belong to the
+    company, not this mission; a CapabilityMapping row is just an edge
+    that "this requirement matched capability X," and it's the edge (not
+    the capability) that stops existing once the requirement is gone.
+    """
+    mission = get_mission(db, mission_id, company_id)
+    if mission.status != MissionStatus.ARCHIVED:
+        raise ConflictError(
+            f"Mission '{mission_id}' must be archived before it can be permanently deleted."
+        )
+
+    mission.recommendation_id = None
+    mission.capability_snapshot_id = None
+    db.flush()
+
+    tender_ids = [row[0] for row in db.query(Tender.id).filter(Tender.mission_id == mission.id).all()]
+
+    if tender_ids:
+        # Nulled before Document rows are deleted below -- Tender.uploaded_document
+        # is itself a live FK to documents.id, so deleting a document a
+        # not-yet-deleted Tender row still points to would violate that
+        # constraint.
+        db.query(Tender).filter(Tender.id.in_(tender_ids)).update(
+            {Tender.uploaded_document: None}, synchronize_session=False
+        )
+
+        requirement_ids = [
+            row[0] for row in db.query(Requirement.id).filter(Requirement.tender_id.in_(tender_ids)).all()
+        ]
+        if requirement_ids:
+            db.query(CapabilityMapping).filter(CapabilityMapping.requirement_id.in_(requirement_ids)).delete(
+                synchronize_session=False
+            )
+
+    recommendation_ids = [
+        row[0] for row in db.query(Recommendation.id).filter(Recommendation.mission_id == mission.id).all()
+    ]
+    if recommendation_ids:
+        db.query(ComplianceMatrix).filter(ComplianceMatrix.recommendation_id.in_(recommendation_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(Recommendation).filter(Recommendation.mission_id == mission.id).delete(synchronize_session=False)
+
+    if tender_ids:
+        db.query(Requirement).filter(Requirement.tender_id.in_(tender_ids)).delete(synchronize_session=False)
+
+        # Physical files are removed before their Document rows -- best
+        # effort, same reasoning as document_service.delete_document()
+        # (a missing file is a no-op for storage.delete_file(), never an
+        # error that should block the rest of the purge).
+        for document in db.query(Document).filter(Document.tender_id.in_(tender_ids)).all():
+            storage.delete_file(document.storage_path)
+        db.query(Document).filter(Document.tender_id.in_(tender_ids)).delete(synchronize_session=False)
+
+        db.query(Tender).filter(Tender.id.in_(tender_ids)).delete(synchronize_session=False)
+
+    db.query(CapabilitySnapshot).filter(CapabilitySnapshot.mission_id == mission.id).delete(synchronize_session=False)
+
+    db.query(AuditLog).filter(AuditLog.mission_id == mission.id).update(
+        {AuditLog.mission_id: None}, synchronize_session=False
+    )
+    db.query(LLMCallEvent).filter(LLMCallEvent.mission_id == mission.id).update(
+        {LLMCallEvent.mission_id: None}, synchronize_session=False
+    )
+
+    db.delete(mission)
+    db.commit()
 
 
 def _try_transition_to_running(db: Session, mission: Mission, expected_status: MissionStatus) -> bool:

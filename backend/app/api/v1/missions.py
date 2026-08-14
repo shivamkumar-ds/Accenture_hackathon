@@ -9,7 +9,7 @@ in the frozen doc names an execution trigger, same precedent as
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -81,6 +81,23 @@ def archive_mission(
 ) -> MissionRead:
     """Archives (soft-delete), never a real DELETE — see mission_service.archive_mission."""
     return mission_service.archive_mission(db, mission_id, current_user.company_id)
+
+
+@router.delete("/{mission_id}/purge", status_code=status.HTTP_204_NO_CONTENT)
+def purge_mission(
+    mission_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """
+    Real, permanent deletion — only reachable for an already-archived
+    Mission (see mission_service.purge_mission's ConflictError). A
+    separate path from DELETE /missions/{id} (which stays the existing
+    soft-delete/archive action) rather than a query param on it, so the
+    two very different operations ("hide it, recoverable" vs "destroy it,
+    irreversible") are never one accidental flag away from each other.
+    """
+    mission_service.purge_mission(db, mission_id, current_user.company_id)
 
 
 # 10/minute per IP (Phase 1.5 finding #2) -- this is the Mission
