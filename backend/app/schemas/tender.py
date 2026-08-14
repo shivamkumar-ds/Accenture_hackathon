@@ -1,7 +1,7 @@
 """Pydantic schemas for Tender and Requirement."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -30,12 +30,34 @@ class RequirementRead(BaseModel):
     description: str | None
     mandatory: bool
     source_page: int | None
+    # Which attached document this requirement came from, and where in it
+    # -- always populated for a multi-document tender; may be None for
+    # Requirement rows persisted before this feature existed. See
+    # models/tender.py and agents/tender_analyzer.py.
+    source_document_id: uuid.UUID | None = None
+    source_location: str | None = None
     confidence: float | None
+
+
+class TenderDocumentRead(BaseModel):
+    """One document attached to a Tender -- the main PDF or any
+    additional technical/financial/annexure document. Deliberately a
+    separate, smaller schema from DocumentRead: the Tender Workspace only
+    needs enough to render "filename + role + status", not every
+    Document field (uploaded_by, storage_path, etc.)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    file_name: str
+    document_role: str | None
+    upload_time: datetime
 
 
 class TenderWithRequirements(BaseModel):
     tender: TenderRead
     requirements: list[RequirementRead]
+    documents: list[TenderDocumentRead] = []
 
 
 class TenderUploadResult(BaseModel):

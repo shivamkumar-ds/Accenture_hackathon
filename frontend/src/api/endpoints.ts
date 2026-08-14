@@ -13,6 +13,7 @@ import type {
   LoginRequest,
   MissionRead,
   RegisterRequest,
+  TenderDocumentRead,
   TenderMetadataGuess,
   TenderUploadResponse,
   TenderWithRequirements,
@@ -127,6 +128,22 @@ export const runAnalysis = (tenderId: string) =>
   apiClient
     .post<TenderWithRequirements>("/api/v1/analysis/run", { tender_id: tenderId })
     .then((r) => r.data);
+
+// Attaches an additional source document (e.g. a technical bid detail
+// spreadsheet, a BOQ) to an existing Tender -- multi-document Tender
+// support. document_role is optional: the backend infers it from the
+// filename ("boq"/"financial"/"price"/"commercial" -> financial, "tech"
+// -> technical, else -> annexure) when omitted.
+export const addTenderDocument = (tenderId: string, file: File, documentRole?: string) => {
+  const form = new FormData();
+  form.append("file", file);
+  if (documentRole) form.append("document_role", documentRole);
+  return apiClient
+    .post<TenderDocumentRead>(`/api/v1/tenders/${tenderId}/documents`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    .then((r) => r.data);
+};
 
 // --- evaluation / decision engine ---
 

@@ -31,6 +31,26 @@ class Document(Base, UUIDPrimaryKeyMixin):
     document_type: Mapped[str] = mapped_column(String, nullable=False)
     file_name: Mapped[str] = mapped_column(String, nullable=False)
     storage_path: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Multi-document Tender support. NULL for every non-tender document
+    # (capability documents, and any Document uploaded before this
+    # feature existed that hasn't been backfilled below). A Tender's
+    # documents are every Document row with tender_id == that tender's
+    # id -- this is the one, general relationship the whole pipeline
+    # reads from; Tender.uploaded_document (unchanged) still identifies
+    # which one is the "main" document for callers that only care about
+    # that single, already-established meaning.
+    tender_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenders.id"), nullable=True, index=True
+    )
+    # Plain string, not an enum -- same reasoning as Tender.category:
+    # this is a product/UX classification (main/technical/financial/
+    # annexure) that may grow without a schema migration, and nothing in
+    # the backend branches on it via a fixed, closed set of Python
+    # values (tender_analyzer.py only special-cases the literal string
+    # "financial" to exclude BOQ/pricing content from LLM extraction --
+    # every other value is treated identically).
+    document_role: Mapped[str | None] = mapped_column(String, nullable=True)
     upload_time: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

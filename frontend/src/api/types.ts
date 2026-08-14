@@ -182,6 +182,12 @@ export interface RequirementRead {
   description: string | null;
   mandatory: boolean;
   source_page: number | null;
+  // Which attached document this requirement came from, and where in it
+  // (e.g. "Sheet: Sheet1" for a spreadsheet-sourced requirement) --
+  // multi-document Tender support. May be null for requirements extracted
+  // before this feature existed.
+  source_document_id: string | null;
+  source_location: string | null;
   confidence: number | null;
 }
 
@@ -196,9 +202,21 @@ export interface TenderRead {
   processing_status: string | null;
 }
 
+// One document attached to a Tender -- the main PDF or any additional
+// technical/financial/annexure document (multi-document Tender support).
+export type TenderDocumentRole = "main" | "technical" | "financial" | "annexure" | string;
+
+export interface TenderDocumentRead {
+  id: string;
+  file_name: string;
+  document_role: TenderDocumentRole | null;
+  upload_time: string;
+}
+
 export interface TenderWithRequirements {
   tender: TenderRead;
   requirements: RequirementRead[];
+  documents: TenderDocumentRead[];
 }
 
 // Response for POST /tenders/extract-metadata -- heuristic-only (regex, no

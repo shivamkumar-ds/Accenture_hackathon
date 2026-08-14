@@ -698,3 +698,163 @@ in addition to the structural regression tests above.
 Closed 14 August 2026. Migration fixed, regression-tested (structurally, with the SQLite
 limitation stated explicitly), and confirmed applying cleanly against a real local
 PostgreSQL database.
+
+## Bug #007
+
+**Title:** Tender could only ever have one source document, and only PDF was accepted —
+a real CPPP government tender (main PDF + technical bid spreadsheet + financial BOQ
+spreadsheet) could not be represented or analyzed at all
+
+**Status:** Fixed — 15 August 2026 (pending the founder's own local validation against the
+real three-file tender, same closure pattern as Bug #006)
+
+**Date:** 15 August 2026
+
+**Severity:** High (product-defining limitation, not a peripheral bug — real-world
+procurement tenders routinely ship as a main tender document plus one or more spreadsheet
+attachments, e.g. a technical bid detail sheet and a financial Bill of Quantities. A
+platform that can only accept a single PDF per tender cannot evaluate this entire, common
+class of real tenders at all)
+
+**Category:** Backend / Product architecture (Tender ↔ Document data model, document
+parsing, tender analysis pipeline) + Frontend (Tender Workspace)
+
+### Symptoms
+
+- Discovered during local customer-journey validation (per the founder's own Master
+  Launch Control plan) using an actual, real CPPP (Indian government e-procurement)
+  tender: `tender.pdf` (main tender document), `tech.xls` (technical bid detail), and
+  `BOQ_969057.xls` (financial Bill of Quantities) — three files that all genuinely belong
+  to the same tender.
+- `Tender.uploaded_document` was a single, nullable foreign key to one `Document` row —
+  there was no schema-level way to attach a second document to an existing Tender at all.
+- `app/core/storage.py`'s `ALLOWED_EXTENSIONS`/`ALLOWED_CONTENT_TYPES` only recognized
+  `.pdf`/`.docx`/`.png`/`.jpg`/`.jpeg` — any `.xls`/`.xlsx` upload was rejected outright
+  with `UnsupportedFileTypeError` before ever reaching the analysis pipeline.
+- `app/agents/document_parser.py` had no spreadsheet extraction path at all.
+- `app/agents/tender_analyzer.py`'s `analyze_tender()` took exactly one `Path` and called
+  `extract_pdf_pages()` on it — structurally incapable of combining more than one source
+  document into a single extraction run, even if the schema had allowed attaching one.
+
+This was not a data-corruption or crash bug — the existing single-PDF flow worked exactly
+as designed. It is a genuine, pre-existing product capability gap: the product's data
+model and pipeline were built around an assumption ("one tender = one PDF") that does not
+hold for a real, common class of tenders. Not a newly introduced defect from this session's
+other work.
+
+### Root Cause
+
+The Tender ↔ Document relationship was modeled as a single nullable FK
+(`Tender.uploaded_document`) from the earliest schema design onward, and every downstream
+consumer (`tender_service.run_analysis()`, `tender_analyzer.analyze_tender()`,
+`document_parser.extract_text()`'s format dispatch, `storage.ALLOWED_EXTENSIONS`) was built
+to match that one-document, PDF-only assumption. Nothing in the architecture was wrong for
+the tenders it was tested against during development — the gap only became visible against
+a real government tender bundle, which is exactly why the founder's "validate with a real
+external tender before declaring the product done" step in the Master Launch Control plan
+exists.
+
+### Why the existing (SQLite-based) test suite did not catch it
+
+This was a missing-capability gap, not a behavioral bug in existing code — no test could
+have caught it because there was no code path to attach a second document to a Tender or
+to parse a spreadsheet at all. SQLite vs. PostgreSQL is not the relevant distinction here
+(unlike Bugs #005/#006); the gap was in the product's schema and pipeline design, equally
+absent in every environment.
+
+### Fix
+
+Implemented the general solution the founder explicitly required — ONE TENDER → MULTIPLE
+SOURCE DOCUMENTS → MULTIPLE SUPPORTED FORMATS → ONE REQUIREMENT/DECISION PIPELINE, not a
+special case for this one tender:
+
+- **Schema** (migration `d4e5f6a7b8c9`, additive/nullable only): `documents.tender_id` +
+  `documents.document_role` (the general Tender↔Document relationship, replacing the
+  implicit single-document assumption); `requirements.source_document_id` +
+  `requirements.source_location` (format-agnostic provenance, e.g. `"Sheet: Sheet1"`,
+  alongside the existing `source_page`, unchanged in meaning for PDF-sourced requirements).
+  A backfill UPDATE links every pre-existing Tender's Document via the new columns so no
+  special-case fallback code is ever needed for old data.
+- **File format support**: `openpyxl` (`.xlsx`) and `xlrd` (`.xls`, openpyxl cannot read
+  the legacy binary format at all) added to `document_parser.py`'s
+  `extract_spreadsheet_sheets()` — row/column structure preserved as `"cell | cell"` lines
+  per sheet, empty sheets and rows dropped, never a binary/raw dump.
+- **Storage allowlist**: `.xls`/`.xlsx` added to `storage.ALLOWED_EXTENSIONS`, with a
+  scoped content-type leniency for `application/octet-stream` (real CPPP/GeM portals
+  routinely serve spreadsheet attachments with this generic content-type rather than the
+  correct MIME type — confirmed against the actual tender files this fix was built
+  against).
+- **Analysis pipeline**: `tender_analyzer.analyze_tender()` generalized to accept a list of
+  `TenderSourceDocument`s. Every non-financial-role document's content (PDF pages or
+  spreadsheet sheets alike) is flattened into one ordered sequence of `SourceUnit`s and fed
+  through the *exact same* chunking / `[PAGE N]`-marker / LLM-prompt mechanism that already
+  existed for PDF-only tenders — `prompts/tender_requirement.py`, `schemas/extraction.py`,
+  and `mock_extraction.py` needed zero changes as a result. Financial/BOQ-role documents
+  are excluded from LLM input by a simple deterministic filter (not a second AI call) since
+  pricing line items are not tender requirements. `tender_service.run_analysis()` now
+  gathers every `Document` attached via `tender_id` (via `contextlib.ExitStack`, so a
+  GCS-backed tender can hold several documents' temp files open for one analysis run) in
+  place of the single `uploaded_document` lookup.
+- **API**: new `POST /tenders/{tender_id}/documents` (reuses
+  `document_service.upload_document()`'s validation/storage path — same allowlist, same
+  size limit); `GET /tenders/{tender_id}` and `POST /analysis/run` now also return the
+  attached `documents` list. No new DELETE endpoint — the existing
+  `DELETE /documents/{id}` was generalized (its blocking-tender check now also covers
+  `Document.tender_id`, not just the legacy `uploaded_document`) and reused.
+- **Document roles**: inferred from filename when not explicitly supplied
+  (`boq`/`financial`/`price`/`commercial` → financial, `tech` → technical,
+  `annex`/`supporting` → annexure, else → annexure), matching `Tender.category`'s existing
+  plain-string convention rather than a new enum.
+- **Frontend**: a "Tender Documents" card on the Tender Workspace (`Evaluation.tsx`) lists
+  every attached document with a role badge and an "Add document" control (PDF/XLS/XLSX),
+  matching the existing card visual language — no redesign of the frozen page structure.
+
+### Backward compatibility
+
+Verified explicitly, not assumed: a Tender with exactly one PDF and no other documents
+produces byte-identical `source_page` values to the pre-existing single-document behavior
+(`test_pdf_only_tender_analysis_unchanged`); the existing Bug #002 regression test
+(`test_tender_analysis_failure_modes.py`) and every other pre-existing tender/document test
+still pass unchanged.
+
+### Prevention / Regression coverage
+
+`backend/tests/test_tender_multi_document.py` — 19 tests, using real PDF (via `reportlab`)
+and real `.xlsx` (via `openpyxl`) files on disk plus `provider="mock"`
+(`app/agents/mock_extraction.py`) rather than a real LLM call, driving the actual
+`tender_analyzer`/`tender_service`/`document_service`/`storage` code: PDF-only backward
+compatibility, `upload_tender()` linking the new relationship, XLS/XLSX accepted (including
+the octet-stream leniency), unsupported extensions still rejected, spreadsheet parsing
+(single sheet, multiple sheets, empty sheet dropped), combined PDF+spreadsheet extraction
+with correct per-requirement source-document/source-location traceability, financial-role
+document exclusion from LLM input, multi-document attachment with filename-based and
+explicit role assignment, company isolation on the new document-list/add-document paths,
+and the generalized document-deletion blocking check. All in-memory SQLite (this project's
+standing convention) — nothing in this feature depends on PostgreSQL-specific behavior, so
+(unlike Bugs #005/#006) there is no stated SQLite limitation here.
+
+### Engineering Rule
+
+**When a product's data model encodes a cardinality assumption ("one X has exactly one
+Y") that reflects the sample data used during development rather than a genuine business
+rule, that assumption will eventually meet real-world data that violates it.** The fix here
+generalized the schema (nullable, additive columns — no breaking change) and threaded the
+same generalization through every layer (storage → parser → analyzer → service → API →
+frontend) rather than special-casing the one real tender that exposed the gap — per the
+founder's explicit standing instruction to implement the general solution, not a workaround.
+
+### Verification
+
+Full backend test suite (87 passing, excluding the pre-existing unrelated SOCKS-proxy
+sandbox artifact in `tests/agents/test_llm_client.py`), `alembic heads` confirms a single
+head (`d4e5f6a7b8c9`), `app.main:app` imports cleanly, frontend `tsc --noEmit` and
+`vite build` both clean. **Pending**: the founder's own local run against the actual
+`tender.pdf` + `tech.xls` + `BOQ_969057.xls` files (Section 7 of the governing spec) — this
+entry will be updated with that real-file confirmation, the same closure pattern used for
+Bug #006.
+
+### Closure
+
+Not yet closed — awaiting the founder's real-tender validation run and explicit
+confirmation, per the standing Bug Bucket lifecycle rule that a fix is not "closed" until
+verified against the actual environment/data it was built for.

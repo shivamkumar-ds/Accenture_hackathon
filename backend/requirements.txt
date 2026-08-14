@@ -49,3 +49,18 @@ slowapi==0.1.10
 # (unlike SMTP on 25/587, which can be finicky from some cloud egress
 # paths -- see docs/DEPLOYMENT.md).
 resend==2.36.0
+
+# Tender multi-document support (real CPPP tender validation gap) --
+# spreadsheet parsing for tech.xls/BOQ.xls-style tender attachments.
+# openpyxl reads the modern OOXML .xlsx format; xlrd is the only
+# maintained pure-Python reader for the legacy binary .xls format
+# openpyxl dropped support for -- both mature, widely used, lightweight
+# (no compiled extensions, no heavy transitive dependency tree).
+openpyxl==3.1.5
+xlrd==2.0.1
+
+# Test-only: generates a genuinely valid, pypdf-readable PDF with real
+# extractable text for tests/test_tender_multi_document.py -- a fake
+# '%PDF'-prefixed byte string wouldn't exercise extract_pdf_pages() at
+# all. Not imported anywhere outside the tests/ directory.
+reportlab==4.5.1

@@ -20,6 +20,7 @@ from app.core.rate_limit import limiter
 from app.models import User
 from app.schemas.tender import (
     RequirementRead,
+    TenderDocumentRead,
     TenderMetadataGuess,
     TenderRead,
     TenderUploadResult,
@@ -78,10 +79,33 @@ def get_tender(
 ) -> TenderWithRequirements:
     tender = tender_service.get_tender(db, tender_id, current_user.company_id)
     requirements = tender_service.get_requirements(db, tender.id)
+    documents = tender_service.list_tender_documents(db, tender.id, current_user.company_id)
     return TenderWithRequirements(
         tender=TenderRead.model_validate(tender),
         requirements=[RequirementRead.model_validate(r) for r in requirements],
+        documents=[TenderDocumentRead.model_validate(d) for d in documents],
     )
+
+
+# 20/minute per IP -- same budget as /tenders/upload, which this reuses
+# document_service.upload_document()'s validation/storage path for (so
+# PDF/XLS/XLSX are accepted, everything else rejected, identically).
+@tenders_router.post(
+    "/{tender_id}/documents", response_model=TenderDocumentRead, status_code=status.HTTP_201_CREATED
+)
+@limiter.limit("20/minute")
+async def add_tender_document(
+    request: Request,
+    tender_id: uuid.UUID,
+    file: UploadFile = File(...),
+    document_role: str | None = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TenderDocumentRead:
+    document = await tender_service.add_tender_document(
+        db, tender_id, current_user.company_id, current_user.id, file, document_role
+    )
+    return TenderDocumentRead.model_validate(document)
 
 
 class RunAnalysisRequest(BaseModel):
@@ -102,8 +126,10 @@ async def run_analysis(
     tender, requirements = await tender_service.run_analysis(
         db, payload.tender_id, current_user.company_id
     )
+    documents = tender_service.list_tender_documents(db, tender.id, current_user.company_id)
 
     return TenderWithRequirements(
         tender=TenderRead.model_validate(tender),
         requirements=[RequirementRead.model_validate(r) for r in requirements],
+        documents=[TenderDocumentRead.model_validate(d) for d in documents],
     )

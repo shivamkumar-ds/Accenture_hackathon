@@ -34,7 +34,74 @@ def extract_text(file_path: Path, extension: str) -> ParsedDocument:
         return ParsedDocument(text=_extract_docx(file_path), used_ocr=False, ocr_confidence=None)
     if extension in (".png", ".jpg", ".jpeg"):
         return _extract_image(file_path)
+    if extension in (".xls", ".xlsx"):
+        sheets = extract_spreadsheet_sheets(file_path, extension)
+        combined = "\n\n".join(f"=== {name} ===\n{text}" for name, text in sheets)
+        return ParsedDocument(text=combined, used_ocr=False, ocr_confidence=None)
     raise ValueError(f"Unsupported file extension for parsing: {extension}")
+
+
+def extract_spreadsheet_sheets(file_path: Path, extension: str) -> list[tuple[str, str]]:
+    """
+    Extracts every non-empty sheet in a spreadsheet as (sheet_name, text)
+    pairs -- structured/textual, never a binary dump, and never a
+    spreadsheet-editing/rendering feature. Each row becomes one line,
+    cells joined with " | ", so row/column relationships stay legible to
+    an LLM without carrying full binary formatting. Fully blank rows and
+    fully blank sheets are dropped rather than passed through as noise.
+
+    .xlsx uses openpyxl (the modern OOXML format). .xls uses xlrd (the
+    legacy binary format, which openpyxl cannot read at all -- xlrd is
+    the only maintained pure-Python reader for it). Real government
+    procurement portals sometimes mislabel a genuinely-OOXML file with a
+    .xls extension (observed against a real CPPP tender's bid documents)
+    -- if xlrd can't open it as legacy binary, this falls back to
+    openpyxl before giving up, rather than failing a file that's
+    actually perfectly readable.
+    """
+    if extension == ".xlsx":
+        return [(name, text) for name, text in _extract_xlsx_sheets(file_path) if text.strip()]
+    if extension == ".xls":
+        try:
+            sheets = _extract_xls_sheets(file_path)
+        except Exception:
+            sheets = _extract_xlsx_sheets(file_path)
+        return [(name, text) for name, text in sheets if text.strip()]
+    raise ValueError(f"Unsupported spreadsheet extension: {extension}")
+
+
+def _extract_xlsx_sheets(file_path: Path) -> list[tuple[str, str]]:
+    import openpyxl
+
+    workbook = openpyxl.load_workbook(str(file_path), data_only=True, read_only=True)
+    try:
+        result = []
+        for sheet in workbook.worksheets:
+            lines = []
+            for row in sheet.iter_rows(values_only=True):
+                cells = [str(cell).strip() for cell in row if cell is not None and str(cell).strip()]
+                if cells:
+                    lines.append(" | ".join(cells))
+            result.append((sheet.title, "\n".join(lines)))
+        return result
+    finally:
+        workbook.close()
+
+
+def _extract_xls_sheets(file_path: Path) -> list[tuple[str, str]]:
+    import xlrd
+
+    workbook = xlrd.open_workbook(str(file_path))
+    result = []
+    for sheet in workbook.sheets():
+        lines = []
+        for row_index in range(sheet.nrows):
+            row = sheet.row_values(row_index)
+            cells = [str(cell).strip() for cell in row if cell not in (None, "") and str(cell).strip()]
+            if cells:
+                lines.append(" | ".join(cells))
+        result.append((sheet.name, "\n".join(lines)))
+    return result
 
 
 def extract_pdf_pages(file_path: Path) -> list[str]:

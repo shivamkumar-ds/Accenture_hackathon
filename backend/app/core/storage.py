@@ -43,18 +43,35 @@ settings = get_settings()
 STORAGE_ROOT = Path(settings.storage_root)
 CHUNK_SIZE = 1024 * 1024  # 1MB — read/write in chunks so size is enforced during streaming, not after
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".png", ".jpg", ".jpeg"}
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".png", ".jpg", ".jpeg", ".xls", ".xlsx"}
 ALLOWED_CONTENT_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "image/png",
     "image/jpeg",
+    "application/vnd.ms-excel",  # .xls
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # .xlsx
 }
+
+# Real government procurement portals (e.g. CPPP/GeM bid document
+# bundles) routinely serve .xls/.xlsx attachments with a generic
+# "application/octet-stream" Content-Type rather than the correct MIME
+# type -- the browser/OS didn't register a specific handler, not a sign
+# of a malicious or genuinely wrong upload. Every other supported
+# extension still requires its exact, specific content-type; this
+# leniency is deliberately scoped to spreadsheets only, matching the
+# concrete real-world tender file behavior this was found against
+# (tech.xls / BOQ_*.xls from a real CPPP tender), not loosened generally.
+_OCTET_STREAM_LENIENT_EXTENSIONS = {".xls", ".xlsx"}
+_OCTET_STREAM_CONTENT_TYPE = "application/octet-stream"
 
 
 def validate_file_type(filename: str, content_type: str | None) -> None:
     extension = Path(filename or "").suffix.lower()
-    if extension not in ALLOWED_EXTENSIONS or content_type not in ALLOWED_CONTENT_TYPES:
+    content_type_ok = content_type in ALLOWED_CONTENT_TYPES or (
+        extension in _OCTET_STREAM_LENIENT_EXTENSIONS and content_type == _OCTET_STREAM_CONTENT_TYPE
+    )
+    if extension not in ALLOWED_EXTENSIONS or not content_type_ok:
         logger.warning(
             "Upload rejected — unsupported file type: filename=%r content_type=%r", filename, content_type
         )

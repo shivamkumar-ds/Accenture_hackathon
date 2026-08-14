@@ -26,3 +26,5 @@ class DocumentRead(BaseModel):
     upload_time: datetime
     version: int
     processing_status: DocumentProcessingStatus
+    tender_id: uuid.UUID | None = None
+    document_role: str | None = None

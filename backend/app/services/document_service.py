@@ -114,10 +114,19 @@ def delete_document(db: Session, document_id: uuid.UUID, company_id: uuid.UUID) 
     if document.removed_at is not None:
         raise ConflictError(f"Document '{document_id}' has already been deleted.")
 
+    # Generalized for multi-document tenders: document.tender_id covers
+    # BOTH the original "main" document and any additional document
+    # attached via POST /tenders/{id}/documents; the OR against the
+    # legacy Tender.uploaded_document column is a backward-compat
+    # safety net for any pre-migration row the backfill might have
+    # missed, not the primary check anymore.
     blocking_tender = (
         db.query(Tender)
         .join(Mission, Tender.mission_id == Mission.id)
-        .filter(Tender.uploaded_document == document_id, Mission.status != MissionStatus.ARCHIVED)
+        .filter(
+            (Tender.uploaded_document == document_id) | (Tender.id == document.tender_id),
+            Mission.status != MissionStatus.ARCHIVED,
+        )
         .first()
     )
     if blocking_tender is not None:

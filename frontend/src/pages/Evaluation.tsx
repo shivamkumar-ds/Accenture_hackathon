@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
+  addTenderDocument,
   getApprovalHistory,
   getCompany,
   getEvaluation,
@@ -56,7 +57,9 @@ import {
   Check,
   ChevronDown,
   Download,
+  FilePlus2,
   FileSearch,
+  FileText,
   History,
   Lightbulb,
   RefreshCw,
@@ -75,6 +78,16 @@ const VERIFY_OPTIONS: { value: VerificationDecision; label: string }[] = [
   { value: "verified_non_compliant", label: "Verified Non-Compliant" },
   { value: "escalated", label: "Escalated" },
 ];
+
+// Human-readable labels for Document.document_role (multi-document Tender
+// support) -- "main" is the originally uploaded tender PDF; the rest are
+// inferred from filename when a document is attached, or explicitly chosen.
+const DOCUMENT_ROLE_LABELS: Record<string, string> = {
+  main: "Main Tender",
+  technical: "Technical",
+  financial: "Financial",
+  annexure: "Supporting",
+};
 
 const DECISION_STAGES = [
   "Loading capability library…",
@@ -190,6 +203,7 @@ export default function Evaluation() {
   const [assessmentTab, setAssessmentTab] = useState<AssessmentTab>("overview");
   const [analyzing, setAnalyzing] = useState(false);
   const [running, setRunning] = useState(false);
+  const [addingDocument, setAddingDocument] = useState(false);
   const [requirementTypeFilter, setRequirementTypeFilter] = useState<RequirementType | "all">("all");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<MatchStatus | "all">("all");
@@ -214,6 +228,7 @@ export default function Evaluation() {
   // mission/recommendation/compliance_matrix, but this page already has
   // all of that from its own fetches; only decision_events is new data.
   const [decisionEvents, setDecisionEvents] = useState<DecisionEventRead[]>([]);
+  const addDocumentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user?.company_id) return;
@@ -297,6 +312,24 @@ export default function Evaluation() {
       notify("error", extractErrorMessage(err));
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  // Attaches an additional source document (e.g. tech.xls, a BOQ
+  // spreadsheet) to this Tender -- multi-document Tender support. Refetches
+  // the Tender so the new document appears in the list immediately and any
+  // subsequent "Run Tender Analyzer" call picks it up.
+  const handleAddDocument = async (file: File) => {
+    if (!mission?.tender_id) return;
+    setAddingDocument(true);
+    try {
+      await addTenderDocument(mission.tender_id, file);
+      setTenderData(await getTender(mission.tender_id));
+      notify("success", `${file.name} attached to this tender.`);
+    } catch (err) {
+      notify("error", extractErrorMessage(err));
+    } finally {
+      setAddingDocument(false);
     }
   };
 
@@ -533,6 +566,58 @@ export default function Evaluation() {
                   <p className="font-medium tabular-nums">{requirements.length}</p>
                 </div>
               </div>
+            </CardBody>
+          </Card>
+
+          {/* Tender Documents -- multi-document Tender support. A real
+              tender is rarely a single PDF (e.g. a main tender.pdf plus a
+              technical bid spreadsheet and a financial BOQ); this lists
+              every document currently attached and lets the user add more
+              (PDF/XLS/XLSX), all still analyzed as ONE tender. */}
+          <Card>
+            <CardHeader
+              title="Tender Documents"
+              action={
+                <>
+                  <input
+                    ref={addDocumentInputRef}
+                    type="file"
+                    accept=".pdf,.xls,.xlsx"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) handleAddDocument(file);
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={<FilePlus2 size={14} />}
+                    loading={addingDocument}
+                    onClick={() => addDocumentInputRef.current?.click()}
+                  >
+                    Add document
+                  </Button>
+                </>
+              }
+            />
+            <CardBody>
+              {tenderData?.documents?.length ? (
+                <ul className="divide-y divide-border">
+                  {tenderData.documents.map((doc) => (
+                    <li key={doc.id} className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText size={16} className="text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium truncate">{doc.file_name}</span>
+                      </div>
+                      <Badge value={doc.document_role ?? "annexure"} label={DOCUMENT_ROLE_LABELS[doc.document_role ?? ""] ?? "Supporting"} />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">No documents attached yet.</p>
+              )}
             </CardBody>
           </Card>
 

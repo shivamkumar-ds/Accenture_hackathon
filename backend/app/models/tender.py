@@ -45,7 +45,26 @@ class Requirement(Base, UUIDPrimaryKeyMixin):
     )
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     mandatory: Mapped[bool] = mapped_column(Boolean, default=False)
+    # A real PDF page number when the requirement came from a PDF page --
+    # None when it came from a non-paginated source (a spreadsheet sheet)
+    # or when a segment's original unit can't be resolved back to a page.
+    # Unchanged in meaning and always populated exactly as before for a
+    # tender with a single PDF document (multi-document support's
+    # backward-compatibility guarantee) -- see tender_analyzer.py.
     source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Which attached Document this requirement was actually extracted
+    # from -- always populated once a tender has more than one source
+    # document, since source_page alone can no longer identify "which
+    # document" once a tender combines a PDF and a spreadsheet. Nullable
+    # only for Requirement rows persisted before this column existed.
+    source_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id"), nullable=True
+    )
+    # Human-readable, format-agnostic location within source_document_id
+    # -- "Page 3" for a PDF page, "Sheet: Sheet1" for a spreadsheet sheet.
+    # This (not source_page) is what the evidence trail actually displays
+    # for a requirement extracted from a non-PDF source.
+    source_location: Mapped[str | None] = mapped_column(String, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Numeric(5, 4), nullable=True)
 
 
