@@ -680,13 +680,21 @@ is about object identity/DDL de-duplication, not label values.
 Structural: `test_contact_submissions_enum_migration.py`'s three new tests pass, alongside
 the full existing backend suite (SQLite-based — see the stated limitation above). Migration
 structure re-inspected by hand against the fix's own stated requirements (one shared object,
-no inline reconstruction, table dropped before type). **Not yet verified against real
-PostgreSQL** — the founder will run `alembic upgrade head` against their actual local
-database next; this entry will not be marked verified-in-Postgres until that succeeds.
+no inline reconstruction, table dropped before type).
+
+**Verified against real PostgreSQL.** The founder ran `alembic upgrade head` against their
+actual local database:
+
+```
+INFO  [alembic.runtime.migration] Running upgrade b2c3d4e5f6a7 -> c3d4e5f6a7b8, add contact_submissions table (Contact Form Backend)
+```
+
+No error, no traceback — the migration that previously failed with `DuplicateObject` applied
+cleanly on the corrected version. This is the actual proof the fix works, independent of and
+in addition to the structural regression tests above.
 
 ### Closure
 
-Migration fixed and regression-tested (structurally) 14 August 2026. Awaiting the founder's
-real local PostgreSQL confirmation (`alembic upgrade head` succeeding, applying
-`b2c3d4e5f6a7 -> c3d4e5f6a7b8` cleanly) before this can be marked fully closed rather than
-just code-complete.
+Closed 14 August 2026. Migration fixed, regression-tested (structurally, with the SQLite
+limitation stated explicitly), and confirmed applying cleanly against a real local
+PostgreSQL database.
