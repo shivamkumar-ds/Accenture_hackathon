@@ -551,3 +551,142 @@ Closed 13 August 2026. Verified: full backend suite (41/41, including the new te
 passing, single linear Alembic head (`b2c3d4e5f6a7`) confirmed via `alembic history`, fix
 migration reviewed against every other existing enum migration in the schema to confirm no
 other column shares this defect.
+
+---
+
+## Bug #006
+
+**Title:** `contact_submissions` migration raised `DuplicateObject` against real PostgreSQL
+— a second, unnecessary `CREATE TYPE` for an enum shared by two columns
+
+**Status:** Closed — 14 August 2026
+
+**Date:** 14 August 2026
+
+**Severity:** High (blocks the Contact Form Backend feature from ever reaching a real
+database — the migration cannot apply, so the feature is entirely unusable outside the
+SQLite-based test suite)
+
+**Category:** Backend / Database migration
+
+### Symptoms
+
+- Local verification (per the founder's own real local-Postgres testing pass, done
+  deliberately before any GCP work) ran `alembic upgrade head` to apply migration
+  `c3d4e5f6a7b8` ("add contact_submissions table"). It failed with:
+  `sqlalchemy.exc.ProgrammingError: (psycopg2.errors.DuplicateObject) type
+  "contact_email_status" already exists`, on the `CREATE TYPE contact_email_status AS ENUM
+  ('PENDING', 'SENT', 'FAILED')` statement, raised from inside `op.create_table(...)` — not
+  from the migration's own earlier, explicit type-creation line.
+- Alembic reported `Will assume transactional DDL` before running the migration, and
+  PostgreSQL's transactional DDL held: the entire migration (including the type this
+  migration had already successfully created moments earlier, in the same transaction)
+  rolled back cleanly on the error. The founder's database remained exactly at its prior
+  revision, `b2c3d4e5f6a7` — confirmed via `alembic current` before and after the failed
+  attempt. No partial schema, no orphaned type, no manual cleanup was ever required.
+
+### Root Cause
+
+The migration explicitly pre-creates the `contact_email_status` Postgres enum type once
+(`contact_email_status_enum.create(op.get_bind(), checkfirst=True)`), because the type is
+shared by two columns (`notification_status`, `confirmation_status`) on the
+`contact_submissions` table created in the same `op.create_table(...)` call. Each column's
+type was then declared as its own, separately-constructed **generic** `sa.Enum('PENDING',
+'SENT', 'FAILED', name='contact_email_status', create_type=False)`.
+
+`create_type=False` is supposed to stop SQLAlchemy from re-issuing `CREATE TYPE` when a
+column referencing that type is itself created. In SQLAlchemy 2.0.35 (the version pinned in
+`requirements.txt`), that flag does not reliably survive the adaptation of a *generic*
+`sa.Enum` into the Postgres-dialect-specific `ENUM` implementation that actually handles DDL
+dispatch during `op.create_table()`. Each of the two separately-constructed generic `Enum`
+objects was adapted into its own new dialect-impl object at DDL-compile time, and
+SQLAlchemy's per-DDL-run de-duplication memo (`NamedType._check_for_name_in_memos`, which is
+what would otherwise recognize "this named type was already created earlier in this same
+statement") only works when the *same* type object is reused — with two distinct objects,
+the memo never linked them, and the DDL visitor issued `CREATE TYPE` again during
+`create_table`, colliding with the type this migration had already created moments earlier
+in the same open transaction.
+
+This is not a logic error in the application code, not related to Bug #001 or Bug #005, and
+does not affect any other migration in the schema — every other Postgres enum type in this
+project (`user_role`, `user_status`, `auth_provider`, etc.) is used by exactly one column, so
+this specific "one type, two columns, one `create_table`" sharing pattern had never been
+exercised before this migration.
+
+### Why SQLite-based tests did not catch it
+
+Every test in this suite runs against in-memory SQLite (`sqlite:///:memory:`), which has no
+`CREATE TYPE` / native enum concept at all — SQLAlchemy stores an `Enum`-typed column as a
+plain `VARCHAR` with a `CHECK` constraint against SQLite, never emitting anything resembling
+Postgres's named-type DDL. A test suite that only ever runs against SQLite is structurally
+incapable of reproducing this failure, regardless of how thorough it is — the same blind spot
+already documented in Bug #005's Engineering Rule, now confirmed a second time by a distinct
+bug in the same class of code (Postgres-specific enum DDL).
+
+### Fix
+
+Same migration file (`c3d4e5f6a7b8_add_contact_submissions.py`), corrected in place — not a
+new migration, since this one had never successfully applied to any real database (the
+founder's local Postgres included). Two changes:
+
+1. `contact_email_status_enum` is now constructed once, at module level, using
+   `sqlalchemy.dialects.postgresql.ENUM` (the dialect-specific class) rather than generic
+   `sa.Enum`.
+2. That exact same object is reused for the explicit `.create()` call, the
+   `notification_status` column, and the `confirmation_status` column — never
+   re-constructed. `downgrade()` reuses it too for the final `.drop()` call, after
+   `drop_table` (Postgres refuses to drop a type still referenced by a table's column, so the
+   table must go first).
+
+This is the pattern SQLAlchemy's own documentation recommends for "one named Postgres enum
+type shared by multiple columns created in the same `op.create_table()`."
+
+### Prevention
+
+`backend/tests/test_contact_submissions_enum_migration.py` — three tests, statically
+inspecting the migration's actual source (the same technique
+`test_auth_provider_enum_migration.py` uses for Bug #005, since neither bug can be
+reproduced against SQLite): (1) `contact_email_status_enum` is genuinely a
+`postgresql.ENUM` instance with `create_type=False`, not a generic `sa.Enum`; (2)
+`upgrade()`'s source contains no inline `sa.Enum(...)`/`postgresql.ENUM(...)` construction
+anywhere, and references the shared `contact_email_status_enum` object at least three times
+(the explicit `create()` call plus both columns); (3) `downgrade()` drops the table before
+dropping the enum type.
+
+**Explicit limitation, stated plainly:** these are structural/static checks, not a live
+PostgreSQL execution of the migration. This environment has no PostgreSQL instance available
+(no root/sudo, no Docker — the same constraint documented in Bug #005), so nothing in this
+repository's automated test suite can execute `CREATE TYPE`/`op.create_table` DDL against a
+real Postgres server and directly prove the fix works end-to-end. That proof is the
+founder's own `alembic upgrade head` run against their real local PostgreSQL database — see
+Verification below.
+
+### Engineering Rule
+
+**When a single named Postgres enum type is shared by more than one column (or an explicit
+`.create()`/`.drop()` call) within the same migration, construct exactly one
+`sqlalchemy.dialects.postgresql.ENUM(..., create_type=False)` object and reference that same
+object everywhere the type is needed.** Never construct a second `sa.Enum(...)` or
+`postgresql.ENUM(...)` for the same Postgres type name, even with `create_type=False` set —
+generic `sa.Enum`'s `create_type` flag is not guaranteed to survive dialect adaptation during
+`op.create_table()`'s DDL dispatch, and even the dialect-specific class relies on SQLAlchemy
+recognizing it as *the same object already handled* within one DDL run, which only works
+when it genuinely is the same object. This is a distinct lesson from Bug #005 (label casing)
+— both are "Postgres enum DDL is stricter than SQLite lets a test suite notice," but this one
+is about object identity/DDL de-duplication, not label values.
+
+### Verification
+
+Structural: `test_contact_submissions_enum_migration.py`'s three new tests pass, alongside
+the full existing backend suite (SQLite-based — see the stated limitation above). Migration
+structure re-inspected by hand against the fix's own stated requirements (one shared object,
+no inline reconstruction, table dropped before type). **Not yet verified against real
+PostgreSQL** — the founder will run `alembic upgrade head` against their actual local
+database next; this entry will not be marked verified-in-Postgres until that succeeds.
+
+### Closure
+
+Migration fixed and regression-tested (structurally) 14 August 2026. Awaiting the founder's
+real local PostgreSQL confirmation (`alembic upgrade head` succeeding, applying
+`b2c3d4e5f6a7 -> c3d4e5f6a7b8` cleanly) before this can be marked fully closed rather than
+just code-complete.
