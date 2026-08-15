@@ -858,3 +858,40 @@ Bug #006.
 Not yet closed — awaiting the founder's real-tender validation run and explicit
 confirmation, per the standing Bug Bucket lifecycle rule that a fix is not "closed" until
 verified against the actual environment/data it was built for.
+
+### Addendum — 15 August 2026: structural real-file validation (fresh stabilization sweep)
+
+The actual `tender.pdf` (30 pages, NIT Trichy, real prose) + `tech.xls` (24 rows, legacy
+BIFF) + `BOQ_969057.xls` (two sheets, `BoQ1` 43×243 + `Macros` 6×5, legacy BIFF) were
+obtained and driven through the real service layer (`tender_service.upload_tender()` →
+`add_tender_document()` × 2 → `run_analysis()` → `mission_service.execute_mission()`),
+not through pytest — a standalone script against an in-memory SQLite DB, confirming:
+
+- All three files upload and remain attached to one Tender (`list_tender_documents`
+  returns exactly 3 rows).
+- Filename-based role inference is correct on the real filenames: `tech.xls` → `technical`,
+  `BOQ_969057.xls` → `financial` (matches the `"boq"` keyword).
+- `run_analysis()` reaches `processing_status = "completed"` — not stuck at `PROCESSING`.
+- The financial-role exclusion filter is structurally sound (BOQ content never reaches
+  `unit_lookup`, independent of what the LLM extracts).
+
+**Genuine semantic LLM extraction against these files could not be completed in this
+environment.** `provider="openai"` was attempted with a real key (present in this
+session's env) — the sandbox's outbound proxy returned `403 Forbidden` for
+`api.openai.com` (this environment has no general internet egress, only an allowlisted
+proxy; `api.openai.com` is not on it). The attempt failed cleanly, exactly as Bug #002's
+protection is supposed to: `ExtractionError` raised, `Tender.processing_status` set to
+`FAILED` (not stuck), `Mission.status` reverted to `CREATED` (retryable) — a real,
+previously-untested failure mode (network/proxy failure, not a parsing failure) hit the
+same clean-failure path correctly. Re-run with `provider="mock"` afterward confirmed the
+structural pipeline end-to-end but — expectedly — extracted 0 requirements, because
+`mock_extraction.py` only pattern-matches synthetic `"Label: Value"` lines and this is a
+real government tender written in prose; this is a known, already-documented mock
+limitation, not a Bug #007 regression.
+
+**Conclusion: still not closed.** Structural multi-document/multi-format handling is now
+validated against the real files. Genuine semantic extraction quality (does the LLM
+correctly find NIT Trichy's actual eligibility/technical/EMD requirements from this real
+document) still requires a run with real OpenAI network access — i.e. the founder's own
+machine, or a future session with broader network egress. Bug #007 stays open until that
+run happens and is reviewed.
