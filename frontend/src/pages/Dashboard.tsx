@@ -346,9 +346,14 @@ export default function Dashboard() {
               live percentage, so this shows the real running mission and
               its real status rather than inventing a progress bar the
               system can't actually back up. */}
-          <Card>
+          {/* Both cards share a fixed content height (h-72) so neither's
+              size depends on how much it currently has to show -- a long
+              Recent Activity list scrolls internally (overflow-y-auto)
+              instead of growing the card and pushing Ongoing Analysis's
+              card to mismatch it. */}
+          <Card className="flex flex-col">
             <CardHeader title="Ongoing Analysis" />
-            <CardBody>
+            <CardBody className="h-72 overflow-y-auto">
               {loading ? (
                 <SkeletonList rows={2} />
               ) : runningMission ? (
@@ -378,9 +383,9 @@ export default function Dashboard() {
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader title="Recent Activity" action={<Link to="/missions" className="text-xs font-medium text-primary hover:underline">View all</Link>} />
-            <CardBody className="!px-0">
+            <CardBody className="!px-0 h-72 overflow-y-auto">
               {loading ? (
                 <div className="px-6">
                   <SkeletonList rows={3} />
