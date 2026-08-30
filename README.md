@@ -12,7 +12,7 @@ from its two prior lineages.
 
 ## Live Demo
 
-- **App:** accenture-hackathon-ruby.vercel.app
+- **App:** <https://accenture-hackathon-ruby.vercel.app>
 - **Backend API:** https://bidops-backend-417826188084.us-central1.run.app
 
 ## Structure
