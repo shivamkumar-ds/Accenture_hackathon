@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import approval, auth, capabilities, company, contact, documents, evaluation, missions, tenders, users
+from app.api.v1 import approval, auth, capabilities, company, contact, documents, evaluation, missions, portfolio, tenders, users
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -18,3 +18,4 @@ api_router.include_router(evaluation.recommendations_router)
 api_router.include_router(missions.router)
 api_router.include_router(approval.compliance_router)
 api_router.include_router(approval.approval_router)
+api_router.include_router(portfolio.router)

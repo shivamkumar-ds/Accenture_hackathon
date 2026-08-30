@@ -2,17 +2,23 @@ import { apiClient } from "./client";
 import type {
   ApprovalDecisionRequest,
   ApprovalHistoryResponse,
+  BidReadinessConfirmationRead,
   CapabilityGraphResponse,
   ComplianceMatrixEntryRead,
   CompanyRead,
+  CompanyUpdate,
   ContactRequest,
   ContactResponse,
   DocumentRead,
   EvaluationResponse,
   GoogleLoginRequest,
   LoginRequest,
+  ManualCapabilityCreateRequest,
   MissionRead,
+  PortfolioResponse,
+  QualificationOverrideRead,
   RegisterRequest,
+  RevalidationResult,
   TenderDocumentRead,
   TenderMetadataGuess,
   TenderUploadResponse,
@@ -52,6 +58,13 @@ export const submitContactForm = (payload: ContactRequest) =>
 export const getCompany = (companyId: string) =>
   apiClient.get<CompanyRead>(`/api/v1/company/${companyId}`).then((r) => r.data);
 
+// Administrator-only server-side (403 for any other role) -- the frontend
+// also gates the UI action to Administrator so a non-admin never sees an
+// edit affordance that would just fail, but the real enforcement is the
+// backend's require_administrator dependency.
+export const updateCompany = (companyId: string, payload: CompanyUpdate) =>
+  apiClient.patch<CompanyRead>(`/api/v1/company/${companyId}`, payload).then((r) => r.data);
+
 // --- documents ---
 
 export const listDocuments = () => apiClient.get<DocumentRead[]>("/api/v1/documents").then((r) => r.data);
@@ -89,6 +102,23 @@ export const buildCapability = (documentId: string, entityType: string) =>
 // any mission whose current recommendation cited it.
 export const deleteCapability = (entityId: string) =>
   apiClient.delete(`/api/v1/capabilities/${entityId}`).then((r) => r.data);
+
+// Manual capability creation -- no document, no LLM extraction. Admin-only
+// server-side (require_administrator), supports all five entity types
+// including Equipment and FinancialRecord (POST /build cannot create
+// those two -- no extraction agent exists for them).
+export const createCapabilityManual = (payload: ManualCapabilityCreateRequest) =>
+  apiClient.post("/api/v1/capabilities/manual", payload).then((r) => r.data);
+
+// Admin-only server-side (require_administrator) -- already-existing M9
+// endpoint, now also whitelisted for Equipment/FinancialRecord fields (was
+// previously Certification/Employee/Project only). Re-runs the Decision
+// Engine for any mission whose current recommendation cites this entity,
+// same as delete.
+export const updateCapability = (entityId: string, fields: Record<string, unknown>) =>
+  apiClient
+    .patch<RevalidationResult>(`/api/v1/capabilities/${entityId}`, { fields })
+    .then((r) => r.data);
 
 // --- tenders ---
 
@@ -188,6 +218,14 @@ export const archiveMission = (missionId: string) =>
 export const purgeMission = (missionId: string) =>
   apiClient.delete<void>(`/api/v1/missions/${missionId}/purge`).then(() => undefined);
 
+// --- portfolio ---
+// Read-only aggregation over active missions' live evaluation state --
+// see backend/app/services/portfolio_service.py. No request payload; the
+// response is the full source of truth for bucketing/insight, never
+// recomputed client-side.
+
+export const getPortfolio = () => apiClient.get<PortfolioResponse>("/api/v1/portfolio").then((r) => r.data);
+
 // --- approval / Bid Decision ---
 // "AI advises, human decides" -- this is the write path for the Bid
 // Decision feature (docs/BID_DECISION_DESIGN.md). Backed by the existing
@@ -208,3 +246,42 @@ export const verifyComplianceRow = (complianceId: string, payload: VerifyComplia
   apiClient
     .post<ComplianceMatrixEntryRead>(`/api/v1/compliance/${complianceId}/verify`, payload)
     .then((r) => r.data);
+
+// --- bid-readiness confirmation ---
+// Admin-only server-side (require_administrator) -- "Confirm Prepared" on
+// a bid-readiness gap item (SUBMISSION_GATING/FUTURE_CONTRACTUAL_COMMITMENT
+// nature). Never affects qualification -- see decision_engine.compute_qualification()'s
+// boundary rule. Caller should refetch the evaluation after either call.
+export const confirmRequirement = (missionId: string, requirementId: string, note?: string) =>
+  apiClient
+    .post<BidReadinessConfirmationRead>(
+      `/api/v1/missions/${missionId}/requirements/${requirementId}/confirm`,
+      note ? { note } : undefined
+    )
+    .then((r) => r.data);
+
+export const unconfirmRequirement = (missionId: string, requirementId: string) =>
+  apiClient
+    .delete<void>(`/api/v1/missions/${missionId}/requirements/${requirementId}/confirm`)
+    .then(() => undefined);
+
+// --- qualification override ---
+// Admin-only server-side (require_administrator) -- an explicit, audited
+// risk acceptance on a mandatory CAPABILITY_CLAIM qualification gap,
+// distinct from bid-readiness confirmation (see decision_engine.
+// compute_qualification()'s overridden_requirement_ids boundary rule).
+// note is REQUIRED (backend 422s on a blank one) -- this is a real
+// decision, not a checkbox, and must always carry a reason. Caller
+// should refetch the evaluation after either call.
+export const overrideQualificationGap = (missionId: string, requirementId: string, note: string) =>
+  apiClient
+    .post<QualificationOverrideRead>(
+      `/api/v1/missions/${missionId}/requirements/${requirementId}/override`,
+      { note }
+    )
+    .then((r) => r.data);
+
+export const removeQualificationOverride = (missionId: string, requirementId: string) =>
+  apiClient
+    .delete<void>(`/api/v1/missions/${missionId}/requirements/${requirementId}/override`)
+    .then(() => undefined);

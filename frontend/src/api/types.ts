@@ -17,6 +17,20 @@ export type RequirementType =
 export type MatchStatus = "met" | "not_met" | "review_required" | "conditional";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type RecommendationType = "go" | "conditional_go" | "review" | "no_go";
+// Architecture debate Phase 1 -- what KIND of unresolved requirement this
+// is (orthogonal to RequirementType, which is what SECTION of the tender
+// it came from). Nullable on older/legacy requirements extracted before
+// this field existed; always present on anything extracted going forward.
+export type RequirementNature =
+  | "capability_claim"
+  | "submission_gating"
+  | "procedural"
+  | "future_contractual_commitment";
+// Architecture debate Phase 2/5 -- derived evaluation states computed
+// server-side by decision_engine.compute_qualification()/
+// compute_bid_readiness(); never independently recomputed on the frontend.
+export type QualificationStatus = "pass" | "conditional" | "fail";
+export type ReadinessStatus = "ready" | "action_required" | "blocked";
 export type MissionStatus = "created" | "running" | "awaiting_approval" | "completed" | "archived";
 // The human's Business Decision (Bid Decision feature) -- deliberately a
 // separate vocabulary from RecommendationType (the AI's own output). "AI
@@ -94,6 +108,17 @@ export interface CompanyRead {
   country?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// PATCH /api/v1/company/{id} -- Administrator-only. Deliberately excludes
+// registration_number: that's the tenant's legal/uniqueness identity, not
+// an ordinary editable detail (see backend app/schemas/company.py's
+// CompanyUpdate docstring). All fields optional -- only send what
+// actually changed; omitted fields are left untouched server-side.
+export interface CompanyUpdate {
+  name?: string;
+  industry?: string | null;
+  country?: string | null;
 }
 
 export interface DocumentRead {
@@ -296,6 +321,65 @@ export interface GapAnalysisEntry {
   status: MatchStatus;
   reason: string | null;
   source_page: number | null;
+  // Architecture debate Phase 5 additions -- populated from
+  // decision_engine.reconstruct_match_result() (see backend
+  // app/schemas/decision.py's GapAnalysisEntry docstring). Both nullable/
+  // defaulted-empty since older requirements predate requirement_nature
+  // (Phase 1) and most requirements resolve to zero unsupported domains.
+  requirement_nature: RequirementNature | null;
+  unsupported_domains: CapabilityEntityType[];
+  // Bid-readiness confirmation feature -- whether a human has confirmed
+  // this item (a SUBMISSION_GATING/FUTURE_CONTRACTUAL_COMMITMENT gap) is
+  // actually prepared. The item stays in its bucket either way (never
+  // dropped) -- confirmed just changes how it's displayed and whether it
+  // still counts as "unresolved" in remediation_summary.bid_readiness.
+  confirmed: boolean;
+  confirmed_at: string | null;
+  // Qualification override feature -- whether an administrator has
+  // explicitly overridden this item (a mandatory CAPABILITY_CLAIM
+  // qualification gap) despite no real capability evidence existing for
+  // it yet. Unlike `confirmed` (an already-true fact), `overridden`
+  // represents an explicit, audited risk acceptance -- render it
+  // visually distinct from "requirement met," never absorbed into it.
+  overridden: boolean;
+  overridden_by: string | null;
+  overridden_by_name: string | null;
+  overridden_at: string | null;
+  override_note: string | null;
+}
+
+// Architecture debate Phase 5 -- the single deterministic backend
+// representation of "what does this evaluation actually require, and
+// why" (app/schemas/decision.py's RemediationSummary). The frontend/PDF
+// render these buckets directly; they do not independently reclassify
+// gap_analysis entries into qualification/readiness/coverage/review
+// groups -- that decision is made once, server-side, by
+// decision_engine.classify_remediation().
+export interface RemediationSummary {
+  qualification: QualificationStatus;
+  qualification_gaps: GapAnalysisEntry[];
+
+  bid_readiness: ReadinessStatus;
+  blocked_items: GapAnalysisEntry[];
+  action_required_items: GapAnalysisEntry[];
+
+  coverage_gaps: GapAnalysisEntry[];
+
+  human_review_items: GapAnalysisEntry[];
+
+  // Architecture debate Phase 6 (REVIEW-explainability gap) -- non-
+  // mandatory CAPABILITY_CLAIM requirements with a definitive NOT_MET
+  // verdict. Not a qualification risk (qualification only ever looks at
+  // mandatory items) and not ambiguous (NOT_MET is definitive, nothing
+  // for a human to adjudicate) -- but the one item shape that can push
+  // `recommendation.recommendation_type` to "review" (via the backend's
+  // settings.max_optional_review_items threshold) while contributing to
+  // no other bucket here. Render this directly; never recompute the
+  // threshold or re-derive this set from gap_analysis/compliance_matrix
+  // client-side -- see decision_engine.classify_remediation()'s
+  // docstring for the exhaustive backend-side proof that this is the
+  // only such item shape.
+  optional_capability_gaps: GapAnalysisEntry[];
 }
 
 export interface RecommendationRead {
@@ -317,6 +401,11 @@ export interface EvaluationResponse {
   recommendation: RecommendationRead;
   compliance_matrix: ComplianceMatrixEntryRead[];
   gap_analysis: GapAnalysisEntry[];
+  // Required, not optional -- the deployed backend contract (Phase 5)
+  // guarantees this is always populated on every EvaluationResponse.
+  // Do not add a fallback/degraded path for its absence; see the Phase 6
+  // inspection report's discussion of backward compatibility.
+  remediation_summary: RemediationSummary;
 }
 
 export interface MissionRead {
@@ -338,6 +427,58 @@ export interface MissionRead {
   // GET /missions/:id; null on other mission action responses.
   tender_id: string | null;
   tender_name: string | null;
+}
+
+// --- Bid-readiness confirmation ---
+// POST/DELETE /api/v1/missions/{mission_id}/requirements/{requirement_id}/confirm
+
+export interface BidReadinessConfirmationRead {
+  id: string;
+  requirement_id: string;
+  confirmed_by: string;
+  confirmed_at: string;
+  note: string | null;
+}
+
+// --- Qualification override ---
+// POST/DELETE /api/v1/missions/{mission_id}/requirements/{requirement_id}/override
+// Distinct from bid-readiness confirmation -- see GapAnalysisEntry.overridden's
+// own comment. A real, audited administrator risk-acceptance, not a
+// confirmation of an already-true fact; note is REQUIRED at creation time.
+export interface QualificationOverrideRead {
+  id: string;
+  requirement_id: string;
+  overridden_by: string;
+  overridden_at: string;
+  note: string | null;
+}
+
+// --- Manual capability creation -- POST /api/v1/capabilities/manual ---
+// No document required, admin-gated. Supports all five entity types
+// (unlike POST /capabilities/build, which only supports the three with a
+// document-extraction agent). `fields` is intentionally loose (matches
+// the backend's ManualCapabilityCreateRequest.fields dict[str, Any]) --
+// per-entity-type validation happens server-side.
+export interface ManualCapabilityCreateRequest {
+  entity_type: CapabilityEntityType;
+  fields: Record<string, unknown>;
+}
+
+// --- Capability field update -- PATCH /api/v1/capabilities/{id} ---
+// Pre-existing M9 endpoint (revalidation_service.handle_capability_update),
+// generic across all five entity types via capability_service.PATCHABLE_FIELDS
+// -- only just extended to cover Equipment/FinancialRecord. `fields` mirrors
+// the same loose dict[str, Any] shape as manual creation; unknown/unpatchable
+// field names 422 server-side.
+export interface CapabilityUpdateRequest {
+  fields: Record<string, unknown>;
+}
+
+export interface RevalidationResult {
+  entity_id: string;
+  changed_fields: string[];
+  affected_missions: string[];
+  new_recommendations: string[];
 }
 
 // --- Bid Decision (Human Approval Layer -- POST/GET /api/v1/approval) ---
@@ -375,4 +516,64 @@ export interface ApiErrorDetail {
 
 export interface ApiValidationError {
   detail: ApiErrorDetail[];
+}
+
+// --- Portfolio (GET /api/v1/portfolio) ---
+// Mirrors backend/app/schemas/portfolio.py exactly. Purely a read model
+// over data the Decision Engine / Evaluation response already produce --
+// no new persisted concept, no frontend-side recomputation of any of it
+// (bucket, insight, active-mission definition all come from the backend
+// as-is; see Portfolio.tsx's own comment).
+
+export interface OpportunitySummary {
+  mission_id: string;
+  tender_name: string | null;
+  // LIVE-recomputed value (same one GET /evaluation/{mission_id} returns,
+  // override-aware) -- never derived client-side.
+  recommendation_type: RecommendationType;
+  overall_confidence: number | null;
+}
+
+export interface NotYetAnalyzedMission {
+  mission_id: string;
+  tender_name: string | null;
+  status: MissionStatus;
+}
+
+export interface UnableToLoadMission {
+  mission_id: string;
+  tender_name: string | null;
+}
+
+export interface PortfolioInsight {
+  what: string;
+  why: string;
+  now_what: string;
+  affected_requirement_types: RequirementType[];
+  affected_mission_ids: string[];
+}
+
+// Second, deliberately minimal Portfolio insight -- HOW MANY active
+// opportunities carry any mandatory qualification gap (vs. the flagship
+// PortfolioInsight's WHAT single requirement-type is most common). Counts
+// a mission even if the gap has since been overridden -- an override is
+// bid-specific risk acceptance, not proof the underlying gap disappeared.
+export interface QualificationRiskExposure {
+  what: string;
+}
+
+export interface PortfolioResponse {
+  prioritize: OpportunitySummary[];
+  review: OpportunitySummary[];
+  deprioritize: OpportunitySummary[];
+  not_yet_analyzed: NotYetAnalyzedMission[];
+  unable_to_load: UnableToLoadMission[];
+  // null only when there are zero analyzed missions with at least one
+  // qualification gap between them.
+  insight: PortfolioInsight | null;
+  // null only when there are zero analyzed active missions; otherwise
+  // always present, including the honest "0 of M" case.
+  qualification_risk_exposure: QualificationRiskExposure | null;
+  analyzed_count: number;
+  active_count: number;
 }

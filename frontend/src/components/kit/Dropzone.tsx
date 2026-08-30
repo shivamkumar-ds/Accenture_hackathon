@@ -93,7 +93,7 @@ export function Dropzone({
       }}
       className={cn(
         compact
-          ? "flex items-center gap-2 rounded-lg border-2 border-dashed px-4 cursor-pointer transition-colors"
+          ? "flex items-start gap-2 rounded-lg border-2 border-dashed px-4 py-3 cursor-pointer transition-colors"
           : "flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-surface-hover",
@@ -105,7 +105,7 @@ export function Dropzone({
           <div className={cn("w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition", dragging ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
             <UploadCloud size={13} />
           </div>
-          <p className="text-sm truncate">
+          <p className="text-sm min-w-0">
             <span className="text-primary font-medium">Click to upload</span>{" "}
             <span className="text-muted-foreground">or drag and drop · {hint}</span>
           </p>

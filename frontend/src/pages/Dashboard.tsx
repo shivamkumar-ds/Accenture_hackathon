@@ -1,64 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { executeMission, getCapabilityGraph, getEvaluation, listMissions } from "../api/endpoints";
+import { Link } from "react-router-dom";
+import { getEvaluation, getPortfolio, listMissions } from "../api/endpoints";
 import { extractErrorMessage } from "../api/client";
 import { useToast } from "../context/ToastContext";
 import { tenderDisplayName } from "../lib/tenderName";
-import type { CapabilityGraphResponse, EvaluationResponse, MissionRead, MissionStatus } from "../api/types";
-import {
-  Badge,
-  Card,
-  CardBody,
-  CardHeader,
-  EmptyState,
-  Menu,
-  MenuItem,
-  SkeletonList,
-  SkeletonStatRow,
-  StatCard,
-  useGreeting,
-} from "../components/kit";
-import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  FileSearch,
-  FileUp,
-  Layers,
-  Loader2,
-  MoreVertical,
-  Radar,
-  Sparkles,
-} from "lucide-react";
+import { recommendationLabel } from "../lib/recommendationLabels";
+import { cn } from "../lib/cn";
+import type { EvaluationResponse, MissionRead, PortfolioResponse, RecommendationType } from "../api/types";
+import { Badge, Card, CardBody, CardHeader, SkeletonList, SkeletonStatRow, useGreeting } from "../components/kit";
+import { ArrowDown, ArrowRight } from "lucide-react";
 
-// Real MissionStatus values, relabeled for the "Evaluation Status" column --
-// Badge already maps these to consistent tones/icons app-wide.
-const EVAL_STATUS_LABEL: Record<MissionStatus, string> = {
-  created: "Queued",
-  running: "Analysis Running",
-  awaiting_approval: "Awaiting Approval",
-  completed: "Completed",
-  archived: "Archived",
-};
+// Pipeline Decision legend dots -- same four RecommendationType values used
+// everywhere else in the product (Badge's semanticTone map, recommendationLabel),
+// just given a solid dot color instead of Badge's soft pill background.
+const DECISION_SEGMENTS: { key: RecommendationType; toneClass: string }[] = [
+  { key: "go", toneClass: "bg-success" },
+  { key: "conditional_go", toneClass: "bg-warning" },
+  { key: "review", toneClass: "bg-info" },
+  { key: "no_go", toneClass: "bg-danger" },
+];
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const { notify } = useToast();
-  const navigate = useNavigate();
   // Name dropped from the greeting deliberately (polish pass) -- "Good
   // afternoon 👋" only, subtitle unchanged. useGreeting still supports a
   // name arg for any future caller that wants it.
   const greeting = useGreeting();
   const [missions, setMissions] = useState<MissionRead[]>([]);
   const [evaluations, setEvaluations] = useState<{ mission: MissionRead; evaluation: EvaluationResponse }[]>([]);
-  const [capabilities, setCapabilities] = useState<CapabilityGraphResponse | null>(null);
-  const [runningId, setRunningId] = useState<string | null>(null);
+  const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
 
   const loadMissions = async () => {
     // Archived (= deleted, see Missions.tsx's "delete tender" -> archive_mission)
-    // missions are excluded from every Dashboard view -- stat cards, Recent
-    // Tenders, Ongoing Analysis, Recent Activity -- same as Tender Workspace's
-    // default view. list_missions() has no status filter, applied client-side.
+    // missions are excluded from every Dashboard view -- same as Tender
+    // Workspace's default view. list_missions() has no status filter,
+    // applied client-side.
     const missionList = (await listMissions()).filter((m) => m.status !== "archived");
     setMissions(missionList);
 
@@ -66,8 +43,7 @@ export default function Dashboard() {
     // produced a recommendation_id. Mission status itself normally sits at
     // "awaiting_approval" at that point (there's no in-app approve/complete
     // action yet), so gating this on status === "completed" was undercounting
-    // every evaluation that had a real, ready report -- that was the
-    // Evaluations stat card showing 0 with a report already available.
+    // every evaluation that had a real, ready report.
     const reportable = missionList.filter((m) => m.recommendation_id);
     const results = await Promise.all(
       reportable.map(async (m) => ({ mission: m, evaluation: await getEvaluation(m.id) }))
@@ -79,7 +55,7 @@ export default function Dashboard() {
   useEffect(() => {
     (async () => {
       try {
-        await Promise.all([loadMissions(), getCapabilityGraph().then(setCapabilities)]);
+        await Promise.all([loadMissions(), getPortfolio().then(setPortfolio)]);
       } catch (err) {
         notify("error", extractErrorMessage(err));
       } finally {
@@ -89,331 +65,270 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const criticalGaps = useMemo(
+  // "Active" mirrors Portfolio's own active_count -- falls back to the
+  // client-side non-archived mission count only if the portfolio call
+  // hasn't resolved yet (both fetched in the same Promise.all above, so
+  // this only matters for one render before loading flips to false).
+  const activeCount = portfolio?.active_count ?? missions.length;
+
+  // "Pursuable" reuses the exact same live-recomputed recommendation_type
+  // every evaluation already carries (see backend/app/api/v1/evaluation.py
+  // _build_response -- recommendation.recommendation_type is recomputed
+  // live on every read, never the possibly-stale persisted value). Proceed
+  // (go) and Proceed With Conditions (conditional_go) are the two
+  // recommendation types a company can actually act on; plain "review"
+  // (undecided) and "no_go" are not counted as pursuable.
+  const pursuableCount = useMemo(
     () =>
-      evaluations.reduce(
-        (sum, e) => sum + e.evaluation.gap_analysis.filter((g) => g.mandatory && g.status === "not_met").length,
-        0
-      ),
+      evaluations.filter((e) => {
+        const t = e.evaluation.recommendation.recommendation_type;
+        return t === "go" || t === "conditional_go";
+      }).length,
     [evaluations]
   );
 
-  const runningMission = missions.find((m) => m.status === "running") ?? null;
+  // "Deprioritized" = analyzed opportunities whose live recommendation is
+  // specifically no_go -- distinct from Portfolio's broader "deprioritize"
+  // bucket only in that this Dashboard consistently keys every number off
+  // recommendation_type directly (see pursuableCount's comment above),
+  // never off Portfolio's bucket grouping.
+  const deprioritizedCount = useMemo(
+    () => evaluations.filter((e) => e.evaluation.recommendation.recommendation_type === "no_go").length,
+    [evaluations]
+  );
 
-  // "Recent Activity" -- merged from real timestamped events we already
-  // have (mission uploaded, mission completed, capability record added).
-  // No fabricated activity log or notification feed.
-  const recentActivity = useMemo(() => {
-    type Item = { id: string; icon: typeof FileUp; label: string; detail: string; at: string };
-    const items: Item[] = [];
-
-    missions.forEach((m) => {
-      items.push({ id: `up-${m.id}`, icon: FileUp, label: "Tender uploaded", detail: tenderDisplayName(m), at: m.created_at });
-      if (m.completed_at) {
-        items.push({ id: `done-${m.id}`, icon: CheckCircle2, label: "Evaluation completed", detail: tenderDisplayName(m), at: m.completed_at });
-      }
+  // The single most-confident pursuable opportunity, for the hero panel's
+  // "what does pursuable actually look like" highlight. Never invents a
+  // name when nothing is pursuable -- the panel shows an honest "none
+  // currently pursuable" line instead (see JSX below).
+  const topPursuable = useMemo(() => {
+    const pursuable = evaluations.filter((e) => {
+      const t = e.evaluation.recommendation.recommendation_type;
+      return t === "go" || t === "conditional_go";
     });
+    if (pursuable.length === 0) return null;
+    return pursuable.reduce((best, e) =>
+      (e.evaluation.recommendation.overall_confidence ?? -1) > (best.evaluation.recommendation.overall_confidence ?? -1)
+        ? e
+        : best
+    );
+  }, [evaluations]);
 
-    if (capabilities) {
-      type AnyCapabilityEntry =
-        | CapabilityGraphResponse["certifications"][number]
-        | CapabilityGraphResponse["employees"][number]
-        | CapabilityGraphResponse["projects"][number]
-        | CapabilityGraphResponse["equipment"][number]
-        | CapabilityGraphResponse["financial_records"][number];
-      const named = (c: AnyCapabilityEntry) =>
-        ("certification_name" in c && c.certification_name) ||
-        ("name" in c && c.name) ||
-        ("equipment_name" in c && c.equipment_name) ||
-        "Company record";
-      const allEntries: AnyCapabilityEntry[] = [
-        ...capabilities.certifications,
-        ...capabilities.employees,
-        ...capabilities.projects,
-        ...capabilities.equipment,
-        ...capabilities.financial_records,
-      ];
-      allEntries.forEach((c) =>
-        items.push({ id: `cap-${c.id}`, icon: Layers, label: "Capability added", detail: named(c), at: c.created_at })
-      );
-    }
-
-    return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6);
-  }, [missions, capabilities]);
+  // Pursuit-decision distribution across analyzed opportunities, keyed by
+  // the same live recommendation_type used above -- not Portfolio's
+  // prioritize/review/deprioritize buckets, which deliberately fold
+  // "review" (undecided) and "conditional_go" (Proceed With Conditions)
+  // into one "review" bucket. Keeping the four real recommendation types
+  // distinct here keeps this distribution consistent with the Pursuable/
+  // Deprioritized numbers above, which also key off recommendation_type
+  // directly.
+  const recommendationDistribution = useMemo(() => {
+    const counts: Record<RecommendationType, number> = { go: 0, conditional_go: 0, review: 0, no_go: 0 };
+    evaluations.forEach((e) => {
+      counts[e.evaluation.recommendation.recommendation_type] += 1;
+    });
+    return counts;
+  }, [evaluations]);
 
   const recentMissions = missions.slice(0, 6);
-
-  const handleRunFullAnalysis = async (missionId: string) => {
-    setRunningId(missionId);
-    try {
-      await executeMission(missionId);
-      notify("success", "Full analysis complete — recommendation generated.");
-      await loadMissions();
-    } catch (err) {
-      notify("error", extractErrorMessage(err));
-    } finally {
-      setRunningId(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{greeting} 👋</h1>
-        <p className="text-sm text-muted-foreground mt-1">Here's what's happening with your tenders today.</p>
+        <p className="text-sm text-muted-foreground mt-1">Understand your opportunity pipeline and what is blocking growth.</p>
       </div>
 
-      {/* 4 cards, not 5 -- "Evaluations" and the former "Reports" card both
-          showed evaluations.length with different icons/tones and both
-          linked to the now-retired Reports page; that was the same
-          duplicate-responsibility problem the nav consolidation fixed one
-          level up, just visible here as two stat tiles instead of two
-          pages. Kept "Evaluations" (clearer label), dropped the other,
-          repointed to Tender Workspace. */}
+      {/* Opportunity Growth Pulse -- the hero panel. Every number here is
+          either portfolio.active_count (live from GET /api/v1/portfolio)
+          or a plain client-side filter over evaluations[] (the same live-
+          recomputed recommendation_type used throughout this page) -- no
+          new metric, no new backend call, no recomputed business logic. */}
       {loading ? (
         <SkeletonStatRow />
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            label="Tenders"
-            value={missions.length}
-            icon={<FileUp size={16} />}
-            tone="info"
-            trend="Total Uploaded"
-            linkTo="/missions"
-            linkLabel="View all tenders"
-          />
-          <StatCard
-            label="Evaluations"
-            value={evaluations.length}
-            icon={<CheckCircle2 size={16} />}
-            tone="success"
-            trend="Completed"
-            linkTo="/missions"
-            linkLabel="View all evaluations"
-          />
-          <StatCard
-            label="Capability Library"
-            value={capabilities?.summary.total_entities ?? 0}
-            icon={<Layers size={16} />}
-            tone="primary"
-            trend="Capabilities Extracted"
-            linkTo="/capabilities"
-            linkLabel="View library"
-          />
-          <StatCard
-            label="Critical Gaps"
-            value={criticalGaps}
-            icon={<AlertTriangle size={16} />}
-            tone={criticalGaps > 0 ? "danger" : "success"}
-            trend={criticalGaps > 0 ? "Mandatory gaps unresolved" : "None outstanding"}
-            linkTo="/missions"
-            linkLabel="Review gaps"
-          />
-        </div>
-      )}
-
-      <div className="space-y-6">
         <Card>
-          <CardHeader
-            title="Recent Tenders"
-            action={
-                <Link
-                  to="/tenders/new"
-                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors shrink-0"
-                >
-                  <FileUp size={14} /> Upload Tender
-                </Link>
-              }
-            />
-            <CardBody className="!px-0">
-              {loading ? (
-                <div className="px-6">
-                  <SkeletonList rows={4} />
-                </div>
-              ) : recentMissions.length === 0 ? (
-                <div className="px-6">
-                  <EmptyState
-                    compact
-                    icon={Radar}
-                    title="No tenders yet"
-                    description="Upload a tender to start your first mission."
-                    action={
-                      <Link to="/tenders/new" className="text-sm font-medium text-primary hover:underline">
-                        Upload a tender →
-                      </Link>
-                    }
-                  />
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  {/* table-fixed + explicit column widths -- with variable
-                      row counts, auto layout can size header vs. data cells
-                      slightly differently and columns drift out of sync.
-                      Fixed widths guarantee every header sits directly above
-                      its column's data regardless of row count. */}
-                  <table className="w-full text-sm table-fixed">
-                    <colgroup>
-                      <col className="w-[34%]" />
-                      <col className="hidden sm:table-column sm:w-[16%]" />
-                      <col className="w-[14%]" />
-                      <col className="w-[24%]" />
-                      <col className="w-[12%]" />
-                    </colgroup>
-                    <thead>
-                      <tr className="text-left text-xs text-muted-foreground uppercase tracking-wide border-b border-border">
-                        <th className="px-6 py-2.5 font-medium whitespace-nowrap">Tender</th>
-                        <th className="px-3 py-2.5 font-medium hidden sm:table-cell whitespace-nowrap">Uploaded On</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Status</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Evaluation Status</th>
-                        <th className="pl-3 pr-6 py-2.5 font-medium text-right whitespace-nowrap">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {recentMissions.map((m) => (
-                        <tr key={m.id} className="hover:bg-surface-hover transition-colors">
-                          <td className="px-6 py-3">
-                            <Link to={`/missions/${m.id}`} className="flex items-center gap-3 min-w-0 group">
-                              <div className="w-8 h-8 rounded-lg bg-danger-soft text-danger flex items-center justify-center shrink-0 text-[9px] font-bold">
-                                PDF
-                              </div>
-                              <span className="font-medium truncate group-hover:text-primary transition-colors">{tenderDisplayName(m)}</span>
-                            </Link>
-                          </td>
-                          <td className="px-3 py-3 text-muted-foreground tabular-nums hidden sm:table-cell">
-                            {new Date(m.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
-                            <span className="inline-flex items-center rounded-full bg-info-soft text-info px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap">
-                              Uploaded
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
-                            <Badge value={m.status} label={EVAL_STATUS_LABEL[m.status]} withIcon />
-                          </td>
-                          <td className="pl-3 pr-6 py-3 whitespace-nowrap">
-                            {/* Menu's root is a block <div>, which text-align
-                                on the <td> can't shift -- that was the real
-                                misalignment: the header's "Actions" label
-                                hugged the right edge (it's inline text) while
-                                this block element stayed put on the left.
-                                A flex+justify-end wrapper positions it
-                                correctly regardless of what Menu renders. */}
-                            <div className="flex justify-end">
-                              <Menu
-                                align="right"
-                                label={`Actions for ${tenderDisplayName(m)}`}
-                                trigger={
-                                  <span className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-surface-hover hover:text-foreground">
-                                    <MoreVertical size={15} />
-                                  </span>
-                                }
-                              >
-                                <MenuItem icon={<FileSearch size={14} />} onClick={() => navigate(`/missions/${m.id}`)}>
-                                  View Details
-                                </MenuItem>
-                                {m.status === "created" && (
-                                  <MenuItem
-                                    icon={<Sparkles size={14} />}
-                                    onClick={() => handleRunFullAnalysis(m.id)}
-                                  >
-                                    {runningId === m.id ? "Running…" : "Run Full Analysis"}
-                                  </MenuItem>
-                                )}
-                              </Menu>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardBody>
-            {missions.length > recentMissions.length && (
-              <div className="px-6 py-3 border-t border-border">
-                <Link to="/missions" className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1">
-                  View all tenders <ArrowRight size={13} />
-                </Link>
+          <CardBody className="space-y-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Opportunity Growth Pulse</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  How ready is the company to pursue its current opportunities?
+                </p>
+              </div>
+              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-info-soft text-info px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-info" /> Live Pipeline
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 divide-x divide-border">
+              <div className="text-center px-2">
+                <p className="text-4xl font-bold tabular-nums">{activeCount}</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mt-1">
+                  Active Opportunities
+                </p>
+              </div>
+              <div className="text-center px-2">
+                <p className="text-4xl font-bold tabular-nums text-success">{pursuableCount}</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mt-1">Pursuable</p>
+              </div>
+              <div className="text-center px-2">
+                <p className="text-4xl font-bold tabular-nums text-danger">{deprioritizedCount}</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mt-1">
+                  Deprioritized
+                </p>
+              </div>
+            </div>
+
+            {evaluations.length > 0 && (
+              <div className="flex flex-col items-center gap-2 pt-4 border-t border-border">
+                <ArrowDown size={14} className="text-muted-foreground" />
+                {topPursuable ? (
+                  <Link
+                    to={`/missions/${topPursuable.mission.id}`}
+                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                  >
+                    <Badge
+                      value={topPursuable.evaluation.recommendation.recommendation_type}
+                      label={recommendationLabel(topPursuable.evaluation.recommendation.recommendation_type)}
+                      withIcon
+                    />
+                    <span className="text-sm font-medium">
+                      {tenderDisplayName(topPursuable.mission)}
+                      {topPursuable.evaluation.recommendation.overall_confidence != null &&
+                        ` · ${Math.round(topPursuable.evaluation.recommendation.overall_confidence * 100)}%`}
+                    </span>
+                  </Link>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No opportunity is currently pursuable.</p>
+                )}
               </div>
             )}
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Pipeline Decision + Key Business Insight -- deliberately two
+          compact cards, not a new page and not a duplicate of Portfolio.tsx's
+          own bucket lists. The decision split reads recommendationDistribution
+          (derived above from the same live recommendation_type Portfolio
+          uses); the insight card renders portfolio.insight.why/.now_what
+          verbatim -- not one word generated here, same rule Portfolio.tsx's
+          own comment states for its identical rendering of the same field. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="flex flex-col">
+          <CardHeader title="Pipeline Decision" description="How the active pipeline splits by pursuit decision." />
+          <CardBody>
+            {loading ? (
+              <SkeletonList rows={2} />
+            ) : evaluations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No opportunities evaluated yet — run a full analysis to see the pursuit-decision split here.
+              </p>
+            ) : (
+              <ul className="space-y-2.5">
+                {DECISION_SEGMENTS.filter((s) => recommendationDistribution[s.key] > 0).map((s) => (
+                  <li key={s.key} className="flex items-center gap-2 text-sm">
+                    <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", s.toneClass)} />
+                    <span className="text-muted-foreground">{recommendationLabel(s.key)}</span>
+                    <span className="font-semibold tabular-nums ml-auto">{recommendationDistribution[s.key]}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Honest by design: the backend only tracks mission status at one
-              granularity (created/running/awaiting_approval/completed/
-              archived) -- there's no field for step-by-step progress or a
-              live percentage, so this shows the real running mission and
-              its real status rather than inventing a progress bar the
-              system can't actually back up. */}
-          {/* Both cards share a fixed content height (h-72) so neither's
-              size depends on how much it currently has to show -- a long
-              Recent Activity list scrolls internally (overflow-y-auto)
-              instead of growing the card and pushing Ongoing Analysis's
-              card to mismatch it. */}
-          <Card className="flex flex-col">
-            <CardHeader title="Ongoing Analysis" />
-            <CardBody className="h-72 overflow-y-auto">
-              {loading ? (
-                <SkeletonList rows={2} />
-              ) : runningMission ? (
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <p className="text-sm font-medium truncate">{tenderDisplayName(runningMission)}</p>
-                    <Badge value="running" label="Analysis Running" withIcon />
+        <Card className="flex flex-col">
+          <CardHeader title="Key Business Insight" description="What's most worth addressing across the pipeline right now." />
+          <CardBody className="space-y-3">
+            {loading ? (
+              <SkeletonList rows={2} />
+            ) : portfolio?.insight ? (
+              <>
+                <p className="text-sm font-semibold tracking-tight">{portfolio.insight.why}</p>
+                {portfolio.analyzed_count > 0 && (
+                  <div>
+                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{
+                          width: `${(portfolio.insight.affected_mission_ids.length / portfolio.analyzed_count) * 100}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {portfolio.insight.affected_mission_ids.length} / {portfolio.analyzed_count} opportunities affected
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 size={13} className="animate-spin text-primary shrink-0" />
-                    AI engine processing — this can take a few minutes.
-                  </div>
-                </div>
-              ) : (
-                <EmptyState
-                  compact
-                  icon={Loader2}
-                  title="Nothing running right now"
-                  description="Run a full analysis from Tender Workspace to see live status here."
-                  action={
-                    <Link to="/missions" className="text-sm font-medium text-primary hover:underline">
-                      Go to Tender Workspace →
-                    </Link>
-                  }
-                />
-              )}
-            </CardBody>
-          </Card>
-
-          <Card className="flex flex-col">
-            <CardHeader title="Recent Activity" action={<Link to="/missions" className="text-xs font-medium text-primary hover:underline">View all</Link>} />
-            <CardBody className="!px-0 h-72 overflow-y-auto">
-              {loading ? (
-                <div className="px-6">
-                  <SkeletonList rows={3} />
-                </div>
-              ) : recentActivity.length === 0 ? (
-                <div className="px-6">
-                  <EmptyState compact icon={Sparkles} title="No activity yet" description="Activity will appear here as you upload and evaluate tenders." />
-                </div>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {recentActivity.map((a) => (
-                    <li key={a.id} className="px-6 py-3 flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        <a.icon size={14} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{a.label}</p>
-                        <p className="text-xs text-muted-foreground truncate">{a.detail}</p>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{new Date(a.at).toLocaleDateString()}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardBody>
-          </Card>
-        </div>
+                )}
+                <p className="text-sm text-muted-foreground">{portfolio.insight.now_what}</p>
+              </>
+            ) : portfolio && portfolio.analyzed_count > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No common qualification blocker detected across analyzed opportunities.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Evaluate a tender to see the leading qualification blocker across your pipeline here.
+              </p>
+            )}
+            {!loading && (
+              <Link
+                to="/action-center"
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline pt-1"
+              >
+                Turn this insight into action <ArrowRight size={13} />
+              </Link>
+            )}
+          </CardBody>
+        </Card>
       </div>
+
+      <Card>
+        <CardHeader title="Recent Opportunities" />
+        <CardBody className="!px-0">
+          {loading ? (
+            <div className="px-6">
+              <SkeletonList rows={3} />
+            </div>
+          ) : recentMissions.length === 0 ? (
+            <p className="px-6 text-sm text-muted-foreground">Upload a tender to see it appear here.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {recentMissions.map((m) => {
+                const evalEntry = evaluations.find((e) => e.mission.id === m.id);
+                return (
+                  <li key={m.id}>
+                    <Link
+                      to={`/missions/${m.id}`}
+                      className="flex items-center justify-between gap-3 px-6 py-3 hover:bg-surface-hover transition-colors"
+                    >
+                      <span className="text-sm font-medium truncate">{tenderDisplayName(m)}</span>
+                      {evalEntry ? (
+                        <Badge
+                          value={evalEntry.evaluation.recommendation.recommendation_type}
+                          label={recommendationLabel(evalEntry.evaluation.recommendation.recommendation_type)}
+                          withIcon
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground shrink-0">Not yet evaluated</span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardBody>
+        {missions.length > recentMissions.length && (
+          <div className="px-6 py-3 border-t border-border">
+            <Link to="/missions" className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1">
+              View all tenders <ArrowRight size={13} />
+            </Link>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

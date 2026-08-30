@@ -2,6 +2,8 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
+  Briefcase,
+  Target,
   FileStack,
   Layers,
   FileUp,
@@ -20,6 +22,14 @@ import { LiveClock, Logo, Menu, MenuDivider, MenuItem, Switch } from "./kit";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  // Portfolio-level view across active opportunities -- a separate
+  // destination from Dashboard because the two have different jobs:
+  // Dashboard is "what's going on across the company right now" (recent
+  // tenders, recent activity, capability library), Portfolio is "which
+  // active opportunities should I focus on, and why" (bucketed by live
+  // recommendation, plus the one flagship cross-portfolio insight). See
+  // pages/Portfolio.tsx's own module docstring.
+  { to: "/portfolio", label: "Portfolio", icon: Briefcase },
   { to: "/documents", label: "Documents", icon: FileStack },
   { to: "/capabilities", label: "Capabilities", icon: Layers },
   { to: "/tenders/new", label: "Upload Tender", icon: FileUp },
@@ -27,6 +37,13 @@ const navItems = [
   // tenders live (active and archived, via its status filter), so it's
   // also the only remaining entry point into a mission's Tender Assessment.
   { to: "/missions", label: "Tender Workspace", icon: Radar },
+  // "What should I do next?" -- the action-oriented layer over
+  // remediation_summary, distinct from Tender Workspace ("show me
+  // everything about this tender"). See lib/remediationCounts.ts and
+  // pages/ActionCenter.tsx. Placed after Tender Workspace: the detailed
+  // audit view stays the primary/familiar destination, Action Center is
+  // the newer, narrower-purpose companion.
+  { to: "/action-center", label: "Action Center", icon: Target },
 ];
 
 export default function Layout() {

@@ -5,7 +5,7 @@ import { extractErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { Button, Input, Logo } from "../components/kit";
-import { ArrowLeft, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, Users } from "lucide-react";
 
 // Set by whoever creates the OAuth Client ID in Google Cloud Console
 // (APIs & Services -> Credentials) -- unset in every environment until
@@ -211,13 +211,6 @@ export default function Login() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/">
             <Logo size={24} />
-          </Link>
-          <Link
-            to="/"
-            className="text-sm font-medium text-primary inline-flex items-center gap-1.5 hover:underline"
-          >
-            <ArrowLeft size={14} />
-            Back to Home
           </Link>
         </div>
       </header>

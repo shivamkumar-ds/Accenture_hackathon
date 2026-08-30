@@ -2,10 +2,12 @@ import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
+import { usePasteSanitizer } from "./lib/usePasteSanitizer";
 import Layout from "./components/Layout";
-import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Portfolio from "./pages/Portfolio";
+import ActionCenter from "./pages/ActionCenter";
 import Documents from "./pages/Documents";
 import Capabilities from "./pages/Capabilities";
 import TenderUpload from "./pages/TenderUpload";
@@ -26,13 +28,14 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
-      {/* Public marketing landing page -- only reachable at "/" while
-          signed out. Once authenticated, the second "/" route below
-          (inside RequireAuth + Layout) takes over instead, so this
-          doesn't touch any existing authenticated route or internal
-          link -- every "/documents", "/tenders/new" etc. link in the
-          app is untouched by this. */}
-      {!isAuthenticated && <Route path="/" element={<Landing />} />}
+      {/* Accenture demo: the public marketing Landing page is not part
+          of this demo and has been removed from routing (not deleted --
+          pages/Landing.tsx still exists on disk, just unreferenced).
+          Signed-out users at "/" now land directly on Login instead.
+          Once authenticated, the second "/" route below (inside
+          RequireAuth + Layout) takes over as before -- no authenticated
+          route or internal link is touched by this. */}
+      {!isAuthenticated && <Route path="/" element={<Navigate to="/login" replace />} />}
       <Route
         element={
           <RequireAuth>
@@ -41,6 +44,8 @@ function AppRoutes() {
         }
       >
         <Route path="/" element={<Dashboard />} />
+        <Route path="/portfolio" element={<Portfolio />} />
+        <Route path="/action-center" element={<ActionCenter />} />
         <Route path="/documents" element={<Documents />} />
         <Route path="/capabilities" element={<Capabilities />} />
         <Route path="/tenders/new" element={<TenderUpload />} />
@@ -65,6 +70,12 @@ function AppRoutes() {
 }
 
 export default function App() {
+  // App-wide: strips leading/trailing whitespace introduced by pasting
+  // clipboard content (very commonly copied out of a tender PDF, which
+  // often carries leading whitespace from list indentation) into any text
+  // field, anywhere -- see usePasteSanitizer.ts's own docstring.
+  usePasteSanitizer();
+
   return (
     <ThemeProvider>
       <ToastProvider>
