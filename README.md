@@ -10,6 +10,11 @@ Qwen, or Hackathon edition — see `docs/ENGINEERING_DIRECTIVE.md` for why, and
 `backend/99_DECISIONS_LOG.md` (entry D-143) for exactly how this repository was consolidated
 from its two prior lineages.
 
+## Live Demo
+
+- **App:** https://accenture-hackathon-ruby.vercel.app/login
+- **Backend API:** https://bidops-backend-417826188084.us-central1.run.app
+
 ## Structure
 
 - `backend/` — FastAPI + PostgreSQL. See `backend/README.md` for setup, configuration, and
