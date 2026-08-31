@@ -13,6 +13,8 @@ from its two prior lineages.
 ## Live Demo
 
 - **App:** <https://accenture-hackathon-ruby.vercel.app>
+- **Email ID:** admin@bidopsdemo.com
+- **Password:** Demo@12345
 
 ## Structure
 
